@@ -8,6 +8,9 @@
     "scheme": "yaplin",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "ios": {
       "supportsTablet": false
     },
@@ -34,7 +37,9 @@
       ],
       "expo-font",
       "./plugins/withNotificationQueries.js",
-      "expo-secure-store"
+      "./plugins/withForegroundListener.js",
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true

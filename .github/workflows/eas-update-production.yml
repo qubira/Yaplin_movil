@@ -1,0 +1,49 @@
+name: EAS Update — production
+
+# Manual only: someone must trigger this from the Actions tab. It also
+# targets the "production" GitHub Environment, so if that environment has
+# required reviewers configured (Settings > Environments > production),
+# the run pauses and waits for a manual approval before the publish step
+# executes — a second, independent gate on top of the manual trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Descripción del update (para el historial de EAS)"
+        required: true
+        default: "Promote to production"
+
+jobs:
+  update:
+    name: Publish OTA update to production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check for EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Falta el secret EXPO_TOKEN en este repo (Settings > Secrets and variables > Actions)."
+            echo "Genera uno en https://expo.dev/settings/access-tokens"
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish update to the "production" channel
+        run: eas update --channel production --environment production --message "${{ github.event.inputs.message }}" --non-interactive
