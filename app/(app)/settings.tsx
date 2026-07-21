@@ -160,8 +160,16 @@ export default function SettingsScreen() {
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
               <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Plan</Text>
-              <Badge label="Pro" variant="info" size="md" />
+              <Badge label={user?.subscription?.planName ?? '—'} variant="info" size="md" />
             </View>
+            {!!user?.subscription && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Vence</Text>
+                <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                  {new Date(user.subscription.currentPeriodEnd).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+            )}
             <TouchableOpacity onPress={() => setStoreModal(true)}
               style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
               <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Tienda predeterminada</Text>

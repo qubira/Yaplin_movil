@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
 import { useTransactions, useIntegrations, usePreferences, PlinBank } from '../store/PaymentsStore';
 import { useDefaultStore } from '../store/StoresStore';
+import { useAuth } from '../store/AuthStore';
 import {
   parseNotification,
   RawNotification,
@@ -30,6 +31,12 @@ export function useNotificationCapture() {
   const { integrations } = useIntegrations();
   const { preferences } = usePreferences();
   const { defaultStoreId } = useDefaultStore();
+  const { user } = useAuth();
+
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const voiceEnabledRef = useRef(preferences.voiceEnabled);
   useEffect(() => {
@@ -98,11 +105,12 @@ export function useNotificationCapture() {
     return () => subscription.remove();
   }, []);
 
-  // Empty package list while paused: the native side skips its
-  // isPackageAllowed check up front (see ExpoAndroidNotificationListenerService.kt),
-  // so paused notifications never even cross the JS bridge.
+  // Empty package list while paused, or while there's no active (non-suspended,
+  // non-expired) session: the native side skips its isPackageAllowed check up
+  // front (see ExpoAndroidNotificationListenerService.kt), so notifications
+  // never even cross the JS bridge for a blocked account.
   const allowedPackages = useMemo(() => {
-    if (Platform.OS !== 'android' || !preferences.captureActive) return [] as string[];
+    if (Platform.OS !== 'android' || !preferences.captureActive || !user) return [] as string[];
     const packages: string[] = [];
     if (integrations.yape) packages.push(YAPE_PACKAGE);
     if (integrations.izipay) packages.push(IZIPAY_PACKAGE);
@@ -110,7 +118,7 @@ export function useNotificationCapture() {
       if (integrations.plinBanks[bank]) packages.push(PLIN_BANK_PACKAGES[bank]);
     });
     return packages;
-  }, [integrations, preferences.captureActive]);
+  }, [integrations, preferences.captureActive, user]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -127,7 +135,7 @@ export function useNotificationCapture() {
       const subscription = getNativeListener().addListener(
         'onNotificationReceived',
         (event: RawNotification) => {
-          if (!captureActiveRef.current) return;
+          if (!captureActiveRef.current || !userRef.current) return;
           if (__DEV__) console.log('[YapLin] raw notification:', JSON.stringify(event));
           const transaction = parseNotification(event);
           if (!transaction) return;

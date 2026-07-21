@@ -7,6 +7,7 @@ const TOKEN_KEY = 'yaplin.auth.token';
 
 export interface SubscriptionSummary {
   status: 'trial' | 'active' | 'suspended' | 'expired' | 'cancelled';
+  planName: string;
   currentPeriodEnd: string;
   daysRemaining: number;
 }

@@ -1,4 +1,5 @@
 import { View, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../constants/theme';
 import type { SubscriptionSummary } from '../../store/AuthStore';
 
@@ -8,6 +9,7 @@ export default function SubscriptionBanner({
   subscription: SubscriptionSummary | null | undefined;
 }) {
   const { c } = useTheme();
+  const insets = useSafeAreaInsets();
   if (!subscription) return null;
 
   const { daysRemaining, status } = subscription;
@@ -27,7 +29,8 @@ export default function SubscriptionBanner({
     <View
       style={{
         backgroundColor: `${color}22`,
-        paddingVertical: 10,
+        paddingTop: insets.top + 10,
+        paddingBottom: 10,
         paddingHorizontal: 16,
       }}
     >

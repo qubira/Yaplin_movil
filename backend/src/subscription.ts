@@ -9,6 +9,7 @@ export interface AccessCheckResult {
 
 export interface SubscriptionSummary {
   status: string;
+  planName: string;
   currentPeriodEnd: string;
   daysRemaining: number;
 }
@@ -47,7 +48,10 @@ export async function checkBusinessAccess(businessId: string): Promise<AccessChe
 }
 
 export async function getSubscriptionSummary(businessId: string): Promise<SubscriptionSummary | null> {
-  const subscription = await prisma.subscription.findUnique({ where: { businessId } });
+  const subscription = await prisma.subscription.findUnique({
+    where: { businessId },
+    include: { planRef: true },
+  });
   if (!subscription) return null;
 
   const daysRemaining = Math.ceil(
@@ -56,6 +60,7 @@ export async function getSubscriptionSummary(businessId: string): Promise<Subscr
 
   return {
     status: subscription.status,
+    planName: subscription.planRef?.name ?? subscription.plan,
     currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
     daysRemaining,
   };

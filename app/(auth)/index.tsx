@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, ActivityIndicator } from 'react-native';
-import { router, Redirect } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -104,12 +104,6 @@ export default function AuthScreen() {
                   </Text>
                 )}
               </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')} style={{ marginTop: 20, alignItems: 'center' }}>
-              <Text style={{ color: c.ACCENT_CYAN, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
-                ¿Primera vez? Cómo crear tu negocio
-              </Text>
             </TouchableOpacity>
 
           </View>
