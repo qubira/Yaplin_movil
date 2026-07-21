@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "yaplin",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "runtimeVersion": {
       "policy": "fingerprint"
     },
