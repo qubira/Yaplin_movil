@@ -30,8 +30,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFFFFF",
-          "image": "./assets/splash-icon.png"
+          "backgroundColor": "#0A0A0A",
+          "image": "./assets/images/brands/qubira.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
         }
       ],
       "expo-font",
