@@ -3,6 +3,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../constants/theme';
 import type { SubscriptionSummary } from '../../store/AuthStore';
 
+export function isSubscriptionBannerVisible(subscription: SubscriptionSummary | null | undefined): boolean {
+  if (!subscription) return false;
+  const { daysRemaining, status } = subscription;
+  if (status !== 'active' && status !== 'trial') return false;
+  if (daysRemaining > 3 || daysRemaining < 0) return false;
+  return true;
+}
+
 export default function SubscriptionBanner({
   subscription,
 }: {
@@ -10,12 +18,9 @@ export default function SubscriptionBanner({
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  if (!subscription) return null;
+  if (!isSubscriptionBannerVisible(subscription)) return null;
 
-  const { daysRemaining, status } = subscription;
-  if (status !== 'active' && status !== 'trial') return null;
-  if (daysRemaining > 3 || daysRemaining < 0) return null;
-
+  const { daysRemaining } = subscription!;
   const urgent = daysRemaining <= 1;
   const color = urgent ? c.ACCENT_RED : c.WARNING;
   const message =

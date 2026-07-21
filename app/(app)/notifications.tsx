@@ -9,6 +9,7 @@ import { formatAmount, formatTime, Transaction } from '../../mocks/transactions'
 import { useTransactions } from '../../store/PaymentsStore';
 import EmptyState from '../../components/ui/EmptyState';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import { useTopInset } from '../../hooks/useTopInset';
 
 const methodLogos: Record<'yape' | 'plin' | 'izipay', any> = {
   yape:   require('../../assets/images/brands/yape.png'),
@@ -21,6 +22,7 @@ const methodLabels: Record<Transaction['method'], string> = { yape: 'Yape', plin
 export default function NotificationsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { transactions: notifications, removeTransaction, markAllRead } = useTransactions();
 
   const deleteNotification = (id: string) => removeTransaction(id);
@@ -85,7 +87,7 @@ export default function NotificationsScreen() {
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={{ paddingTop: insets.top + 20, paddingHorizontal: 24, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+      <View style={{ paddingTop: topInset + 20, paddingHorizontal: 24, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ color: c.TEXT_PRIMARY, fontSize: 24, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>
           Notificaciones
         </Text>

@@ -12,6 +12,7 @@ import { useTheme, ThemeColors } from '../../constants/theme';
 import { PaymentColors } from '../../constants/colors';
 import { formatAmount, formatTime, formatDate, Transaction } from '../../mocks/transactions';
 import { useTransactions } from '../../store/PaymentsStore';
+import { useTopInset } from '../../hooks/useTopInset';
 import TransactionItem from '../../components/ui/TransactionItem';
 import Avatar from '../../components/ui/Avatar';
 
@@ -109,6 +110,7 @@ function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }
 export default function DashboardScreen() {
   const { c: Colors, toggle } = useTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const hoy = new Date();
 
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
@@ -167,7 +169,7 @@ export default function DashboardScreen() {
 
       {/* Header */}
       <View style={{
-        paddingTop: insets.top + 20, paddingHorizontal: 24, paddingBottom: 20,
+        paddingTop: topInset + 20, paddingHorizontal: 24, paddingBottom: 20,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

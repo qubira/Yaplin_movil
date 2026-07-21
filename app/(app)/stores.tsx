@@ -11,6 +11,7 @@ import { formatAmount, PaymentMethod } from '../../mocks/transactions';
 import { useStores, useTeam } from '../../store/StoresStore';
 import { useTransactions } from '../../store/PaymentsStore';
 import { computeStoreRevenue, StoreRevenue } from '../../services/storeRevenue';
+import { useTopInset } from '../../hooks/useTopInset';
 import Avatar from '../../components/ui/Avatar';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
@@ -171,6 +172,7 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
 export default function StoresScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { stores, addStore, updateStore, removeStore } = useStores();
   const { team } = useTeam();
   const { transactions } = useTransactions();
@@ -207,7 +209,7 @@ export default function StoresScreen() {
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: c.BORDER }]}>
+      <View style={[styles.header, { paddingTop: topInset + 16, borderBottomColor: c.BORDER }]}>
         <View>
           <Text style={[styles.headerTitle, { color: c.TEXT_PRIMARY }]}>Mis tiendas</Text>
           <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{activeCount} activas · {stores.length} total</Text>

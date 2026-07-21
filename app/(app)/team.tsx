@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../constants/theme';
 import { TeamMember } from '../../mocks/stores';
 import { useTeam, useStores } from '../../store/StoresStore';
+import { useTopInset } from '../../hooks/useTopInset';
 import Avatar from '../../components/ui/Avatar';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
@@ -189,6 +190,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
 export default function TeamScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { team, addMember, updateMember, removeMember } = useTeam();
   const { stores } = useStores();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -215,7 +217,7 @@ export default function TeamScreen() {
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 16, borderBottomColor: c.BORDER }]}>
+      <View style={[s.header, { paddingTop: topInset + 16, borderBottomColor: c.BORDER }]}>
         <View>
           <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY }]}>Mi equipo</Text>
           <Text style={[s.headerSub, { color: c.TEXT_SECONDARY }]}>{active} activos · {team.length} total</Text>

@@ -12,6 +12,7 @@ import { useAuth } from '../../store/AuthStore';
 import { isNotificationAccessGranted, openNotificationAccessSettings } from '../../services/androidNotificationAccess';
 import { requestPushPermission } from '../../services/pushNotifications';
 import { getAppVersionInfo } from '../../services/appVersion';
+import { useTopInset } from '../../hooks/useTopInset';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import ThemeToggle from '../../components/ui/ThemeToggle';
@@ -81,6 +82,7 @@ function SectionTitle({ title }: { title: string }) {
 export default function SettingsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const { integrations, setYape, setIzipay, setPlinBank } = useIntegrations();
   const { preferences, setVoiceEnabled, setPushEnabled, setCaptureActive } = usePreferences();
@@ -138,8 +140,8 @@ export default function SettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
 
         {/* User Header */}
-        <View style={{ paddingTop: insets.top + 24, paddingHorizontal: 24, paddingBottom: 32, borderBottomWidth: 1, borderBottomColor: c.BORDER, alignItems: 'center' }}>
-          <View style={{ position: 'absolute', top: insets.top + 16, right: 24 }}>
+        <View style={{ paddingTop: topInset + 24, paddingHorizontal: 24, paddingBottom: 32, borderBottomWidth: 1, borderBottomColor: c.BORDER, alignItems: 'center' }}>
+          <View style={{ position: 'absolute', top: topInset + 16, right: 24 }}>
             <ThemeToggle />
           </View>
           <Avatar initials={user?.initials ?? '—'} size="lg" color={c.ACCENT_PURPLE} />
