@@ -11,6 +11,7 @@ import { useDefaultStore } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
 import { isNotificationAccessGranted, openNotificationAccessSettings } from '../../services/androidNotificationAccess';
 import { requestPushPermission } from '../../services/pushNotifications';
+import { getAppVersionInfo } from '../../services/appVersion';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import ThemeToggle from '../../components/ui/ThemeToggle';
@@ -93,6 +94,7 @@ export default function SettingsScreen() {
   }
   const { defaultStoreId, setDefaultStoreId, stores } = useDefaultStore();
   const { user, logout } = useAuth();
+  const versionInfo = getAppVersionInfo();
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [plinModal, setPlinModal] = useState(false);
   const [storeModal, setStoreModal] = useState(false);
@@ -243,6 +245,23 @@ export default function SettingsScreen() {
               <Ionicons name="log-out-outline" size={18} color={c.ACCENT_RED} style={{ marginRight: 12 }} />
               <Text style={{ flex: 1, color: c.ACCENT_RED, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Cerrar sesión</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Acerca de */}
+          <SectionTitle title="Acerca de" />
+          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Versión</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.version}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Canal</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.channel}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }}>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Actualización</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.updateLabel}</Text>
+            </View>
           </View>
 
         </View>

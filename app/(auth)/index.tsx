@@ -8,6 +8,7 @@ import { Gradients } from '../../constants/colors';
 import { useTheme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthStore';
 import { ApiError } from '../../services/api';
+import { getAppVersionInfo } from '../../services/appVersion';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 
@@ -15,6 +16,7 @@ export default function AuthScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, login, logoutReason, clearLogoutReason } = useAuth();
+  const { version, channel } = getAppVersionInfo();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
@@ -105,6 +107,10 @@ export default function AuthScreen() {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 20 }}>
+              v{version} · {channel}
+            </Text>
 
           </View>
         </ScrollView>
