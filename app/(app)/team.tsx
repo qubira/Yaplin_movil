@@ -8,6 +8,7 @@ import { TeamMember } from '../../mocks/stores';
 import { useTeam, useStores } from '../../store/StoresStore';
 import { useTopInset } from '../../hooks/useTopInset';
 import Avatar from '../../components/ui/Avatar';
+import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 
@@ -191,7 +192,7 @@ export default function TeamScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(16);
-  const { team, addMember, updateMember, removeMember } = useTeam();
+  const { team, teamLoading, addMember, updateMember, removeMember } = useTeam();
   const { stores } = useStores();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addModal, setAddModal] = useState(false);
@@ -278,9 +279,13 @@ export default function TeamScreen() {
         {/* Team list */}
         <View style={{ paddingHorizontal: 20 }}>
           <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginBottom: 10 }]}>Miembros</Text>
-          {team.map(member => (
-            <MemberCard key={member.id} member={member} storeName={storeNameFor(member.storeId)} onPress={() => setSelectedId(member.id)} />
-          ))}
+          {teamLoading ? (
+            <BrandLoader />
+          ) : (
+            team.map(member => (
+              <MemberCard key={member.id} member={member} storeName={storeNameFor(member.storeId)} onPress={() => setSelectedId(member.id)} />
+            ))
+          )}
         </View>
       </ScrollView>
 

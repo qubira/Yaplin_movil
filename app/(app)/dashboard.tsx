@@ -15,6 +15,7 @@ import { useTransactions } from '../../store/PaymentsStore';
 import { useTopInset } from '../../hooks/useTopInset';
 import TransactionItem from '../../components/ui/TransactionItem';
 import Avatar from '../../components/ui/Avatar';
+import BrandLoader from '../../components/ui/BrandLoader';
 
 type Period = 'Hoy' | 'Día' | 'Semana' | 'Mes';
 
@@ -116,7 +117,7 @@ export default function DashboardScreen() {
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
   const [pickerVisible, setPickerVisible] = useState(false);
   const [verTodos, setVerTodos]       = useState(false);
-  const { transactions: allTxns, removeTransaction } = useTransactions();
+  const { transactions: allTxns, transactionsLoading, removeTransaction } = useTransactions();
 
   const [navY, setNavY]     = useState(hoy.getFullYear());
   const [navM, setNavM]     = useState(hoy.getMonth());
@@ -267,7 +268,9 @@ export default function DashboardScreen() {
             )}
           </View>
 
-          {txns.length === 0 ? (
+          {transactionsLoading ? (
+            <BrandLoader />
+          ) : txns.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
               <Ionicons name="receipt-outline" size={40} color={Colors.TEXT_SECONDARY} />
               <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular' }}>

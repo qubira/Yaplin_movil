@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useCallback, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useCallback, useMemo, useRef, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Store, TeamMember } from '../mocks/stores';
 import { api } from '../services/api';
@@ -9,11 +9,13 @@ const DEFAULT_STORE_KEY = 'yaplin.defaultStoreId.v1';
 interface StoresCtxValue {
   stores: Store[];
   hydrated: boolean;
+  storesLoading: boolean;
   refreshStores: () => Promise<void>;
   addStore: (store: Omit<Store, 'id'>) => Promise<void>;
   updateStore: (id: string, patch: Partial<Omit<Store, 'id'>>) => Promise<void>;
   removeStore: (id: string) => Promise<void>;
   team: TeamMember[];
+  teamLoading: boolean;
   refreshTeam: () => Promise<void>;
   addMember: (member: Omit<TeamMember, 'id' | 'initials'> & { password: string }) => Promise<void>;
   updateMember: (id: string, patch: Partial<Omit<TeamMember, 'id' | 'initials'>> & { password?: string }) => Promise<void>;
@@ -30,6 +32,10 @@ export function StoresProvider({ children }: { children: ReactNode }) {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [defaultStoreId, setDefaultStoreIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [storesLoading, setStoresLoading] = useState(true);
+  const [teamLoading, setTeamLoading] = useState(true);
+  const hasLoadedStoresOnceRef = useRef(false);
+  const hasLoadedTeamOnceRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -48,16 +54,28 @@ export function StoresProvider({ children }: { children: ReactNode }) {
   }, [defaultStoreId, hydrated]);
 
   const refreshStores = useCallback(async () => {
-    if (!user) { setStores([]); return; }
-    const remote = await api.get<Store[]>('/stores');
-    setStores(remote);
-    setDefaultStoreIdState(prev => (prev && remote.some(s => s.id === prev) ? prev : (remote[0]?.id ?? null)));
+    if (!user) { setStores([]); setStoresLoading(false); return; }
+    if (!hasLoadedStoresOnceRef.current) setStoresLoading(true);
+    try {
+      const remote = await api.get<Store[]>('/stores');
+      setStores(remote);
+      setDefaultStoreIdState(prev => (prev && remote.some(s => s.id === prev) ? prev : (remote[0]?.id ?? null)));
+    } finally {
+      hasLoadedStoresOnceRef.current = true;
+      setStoresLoading(false);
+    }
   }, [user]);
 
   const refreshTeam = useCallback(async () => {
-    if (!user) { setTeam([]); return; }
-    const remote = await api.get<TeamMember[]>('/team');
-    setTeam(remote);
+    if (!user) { setTeam([]); setTeamLoading(false); return; }
+    if (!hasLoadedTeamOnceRef.current) setTeamLoading(true);
+    try {
+      const remote = await api.get<TeamMember[]>('/team');
+      setTeam(remote);
+    } finally {
+      hasLoadedTeamOnceRef.current = true;
+      setTeamLoading(false);
+    }
   }, [user]);
 
   useEffect(() => { refreshStores().catch(() => {}); }, [refreshStores]);
@@ -66,6 +84,7 @@ export function StoresProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StoresCtxValue>(() => ({
     stores,
     hydrated,
+    storesLoading,
     refreshStores,
     addStore: async (store) => {
       await api.post('/stores', store);
@@ -80,6 +99,7 @@ export function StoresProvider({ children }: { children: ReactNode }) {
       await refreshStores();
     },
     team,
+    teamLoading,
     refreshTeam,
     addMember: async (member) => {
       await api.post('/team', member);
@@ -95,7 +115,7 @@ export function StoresProvider({ children }: { children: ReactNode }) {
     },
     defaultStoreId,
     setDefaultStoreId: setDefaultStoreIdState,
-  }), [stores, hydrated, refreshStores, team, refreshTeam, defaultStoreId]);
+  }), [stores, hydrated, storesLoading, refreshStores, team, teamLoading, refreshTeam, defaultStoreId]);
 
   return <StoresContext.Provider value={value}>{children}</StoresContext.Provider>;
 }
@@ -107,13 +127,13 @@ function useStoresContext(): StoresCtxValue {
 }
 
 export function useStores() {
-  const { stores, hydrated, refreshStores, addStore, updateStore, removeStore } = useStoresContext();
-  return { stores, hydrated, refreshStores, addStore, updateStore, removeStore };
+  const { stores, hydrated, storesLoading, refreshStores, addStore, updateStore, removeStore } = useStoresContext();
+  return { stores, hydrated, storesLoading, refreshStores, addStore, updateStore, removeStore };
 }
 
 export function useTeam() {
-  const { team, refreshTeam, addMember, updateMember, removeMember } = useStoresContext();
-  return { team, refreshTeam, addMember, updateMember, removeMember };
+  const { team, teamLoading, refreshTeam, addMember, updateMember, removeMember } = useStoresContext();
+  return { team, teamLoading, refreshTeam, addMember, updateMember, removeMember };
 }
 
 export function useDefaultStore() {

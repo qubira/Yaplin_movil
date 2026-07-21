@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useCallback, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useCallback, useMemo, useRef, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Transaction } from '../mocks/transactions';
 import { api } from '../services/api';
@@ -64,6 +64,7 @@ function fromRemote(t: RemoteTransaction): Transaction {
 interface PaymentsCtxValue {
   transactions: Transaction[];
   hydrated: boolean;
+  transactionsLoading: boolean;
   refreshTransactions: () => Promise<void>;
   addTransaction: (t: Transaction) => Promise<void>;
   removeTransaction: (id: string) => void;
@@ -86,6 +87,8 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   const [integrations, setIntegrations] = useState<IntegrationsState>(DEFAULT_INTEGRATIONS);
   const [preferences, setPreferences] = useState<PreferencesState>(DEFAULT_PREFERENCES);
   const [hydrated, setHydrated] = useState(false);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const hasLoadedTransactionsOnceRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -115,10 +118,19 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   const refreshTransactions = useCallback(async () => {
     if (!user) {
       setTransactions([]);
+      setTransactionsLoading(false);
       return;
     }
-    const remote = await api.get<RemoteTransaction[]>('/transactions');
-    setTransactions(remote.map(fromRemote));
+    // Only show the loader on the first real fetch — the 10s background
+    // poll below must stay silent, or the indicator would flicker constantly.
+    if (!hasLoadedTransactionsOnceRef.current) setTransactionsLoading(true);
+    try {
+      const remote = await api.get<RemoteTransaction[]>('/transactions');
+      setTransactions(remote.map(fromRemote));
+    } finally {
+      hasLoadedTransactionsOnceRef.current = true;
+      setTransactionsLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -139,6 +151,7 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PaymentsCtxValue>(() => ({
     transactions,
     hydrated,
+    transactionsLoading,
     refreshTransactions,
     addTransaction: async (t) => {
       setTransactions(prev => (
@@ -172,7 +185,7 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     setVoiceEnabled: (v) => setPreferences(prev => ({ ...prev, voiceEnabled: v })),
     setPushEnabled: (v) => setPreferences(prev => ({ ...prev, pushEnabled: v })),
     setCaptureActive: (v) => setPreferences(prev => ({ ...prev, captureActive: v })),
-  }), [transactions, hydrated, refreshTransactions, integrations, preferences]);
+  }), [transactions, hydrated, transactionsLoading, refreshTransactions, integrations, preferences]);
 
   return <PaymentsContext.Provider value={value}>{children}</PaymentsContext.Provider>;
 }
@@ -184,8 +197,8 @@ function usePaymentsContext(): PaymentsCtxValue {
 }
 
 export function useTransactions() {
-  const { transactions, hydrated, refreshTransactions, addTransaction, removeTransaction, markAllRead } = usePaymentsContext();
-  return { transactions, hydrated, refreshTransactions, addTransaction, removeTransaction, markAllRead };
+  const { transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, removeTransaction, markAllRead } = usePaymentsContext();
+  return { transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, removeTransaction, markAllRead };
 }
 
 export function useIntegrations() {

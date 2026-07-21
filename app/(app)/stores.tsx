@@ -13,6 +13,7 @@ import { useTransactions } from '../../store/PaymentsStore';
 import { computeStoreRevenue, StoreRevenue } from '../../services/storeRevenue';
 import { useTopInset } from '../../hooks/useTopInset';
 import Avatar from '../../components/ui/Avatar';
+import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 
@@ -173,7 +174,7 @@ export default function StoresScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(16);
-  const { stores, addStore, updateStore, removeStore } = useStores();
+  const { stores, storesLoading, addStore, updateStore, removeStore } = useStores();
   const { team } = useTeam();
   const { transactions } = useTransactions();
 
@@ -263,9 +264,13 @@ export default function StoresScreen() {
 
         {/* Store cards */}
         <View style={{ paddingHorizontal: 20, gap: 12 }}>
-          {stores.map(store => (
-            <StoreCard key={store.id} store={store} revenue={revenueByStore[store.id] ?? EMPTY_REVENUE} onPress={() => setSelectedStoreId(store.id)} />
-          ))}
+          {storesLoading ? (
+            <BrandLoader />
+          ) : (
+            stores.map(store => (
+              <StoreCard key={store.id} store={store} revenue={revenueByStore[store.id] ?? EMPTY_REVENUE} onPress={() => setSelectedStoreId(store.id)} />
+            ))
+          )}
         </View>
 
       </ScrollView>
