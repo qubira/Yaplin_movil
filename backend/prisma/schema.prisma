@@ -18,14 +18,23 @@ enum StoreStatus {
   inactive
 }
 
+enum SubscriptionStatus {
+  trial
+  active
+  suspended
+  expired
+  cancelled
+}
+
 model Business {
   id        String   @id @default(cuid())
   name      String
   ruc       String?
   createdAt DateTime @default(now())
 
-  users  User[]
-  stores Store[]
+  users        User[]
+  stores       Store[]
+  subscription Subscription?
 }
 
 model User {
@@ -69,4 +78,41 @@ model Transaction {
   status        String   @default("confirmed")
   read          Boolean  @default(false)
   createdAt     DateTime @default(now())
+}
+
+// Subscription/Plan/AdminUser/AuditLog tables are owned and created by the
+// YapLin_Admin back-office (raw SQL, see YapLin_Admin/db/*.sql). They are
+// declared here only so this backend can read/update them with typed
+// Prisma queries. Never run `prisma migrate`/`db push` for these models —
+// only `prisma generate`, the tables already exist in the shared database.
+
+model Plan {
+  id           String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  name         String   @unique
+  price        Decimal  @db.Decimal(10, 2)
+  billingCycle String   @default("monthly")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id               String             @id @default(dbgenerated("gen_random_uuid()::text"))
+  businessId       String             @unique
+  business         Business           @relation(fields: [businessId], references: [id])
+  plan             String             @default("basic")
+  planId           String?
+  planRef          Plan?              @relation(fields: [planId], references: [id])
+  status           SubscriptionStatus @default(trial)
+  startDate        DateTime           @default(now())
+  currentPeriodEnd DateTime
+  amount           Decimal?           @db.Decimal(10, 2)
+  billingCycle     String?
+  autoRenew        Boolean            @default(true)
+  suspendedAt      DateTime?
+  suspendedReason  String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @default(now())
 }
