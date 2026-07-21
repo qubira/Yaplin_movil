@@ -1,6 +1,4 @@
-// Dev: reachable from the phone via `adb reverse tcp:4000 tcp:4000` (same trick used for Metro).
-// Update this to the Render URL once the backend is deployed.
-const API_BASE_URL = 'http://localhost:4000';
+const API_BASE_URL = 'https://yaplin-movil.onrender.com';
 
 let authToken: string | null = null;
 
@@ -10,10 +8,20 @@ export function setApiToken(token: string | null) {
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
+}
+
+const ACCOUNT_BLOCK_CODES = new Set(['ACCOUNT_SUSPENDED', 'ACCOUNT_EXPIRED']);
+
+let onAccountBlocked: ((code: string, message: string) => void) | null = null;
+
+export function setAccountBlockedHandler(fn: typeof onAccountBlocked) {
+  onAccountBlocked = fn;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -30,7 +38,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new ApiError(res.status, (data && data.error) || `Error ${res.status}`);
+    const message = (data && data.error) || `Error ${res.status}`;
+    const code: string | undefined = data && data.code;
+    if (code && ACCOUNT_BLOCK_CODES.has(code)) {
+      onAccountBlocked?.(code, message);
+    }
+    throw new ApiError(res.status, message, code);
   }
   return data as T;
 }

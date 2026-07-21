@@ -23,10 +23,14 @@ const DEFAULT_INTEGRATIONS: IntegrationsState = {
 
 export interface PreferencesState {
   voiceEnabled: boolean;
+  pushEnabled: boolean;
+  captureActive: boolean;
 }
 
 const DEFAULT_PREFERENCES: PreferencesState = {
   voiceEnabled: false,
+  pushEnabled: false,
+  captureActive: true,
 };
 
 interface RemoteTransaction {
@@ -70,6 +74,8 @@ interface PaymentsCtxValue {
   setPlinBank: (bank: PlinBank, v: boolean) => void;
   preferences: PreferencesState;
   setVoiceEnabled: (v: boolean) => void;
+  setPushEnabled: (v: boolean) => void;
+  setCaptureActive: (v: boolean) => void;
 }
 
 const PaymentsContext = createContext<PaymentsCtxValue | null>(null);
@@ -119,6 +125,17 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     refreshTransactions().catch(() => {});
   }, [refreshTransactions]);
 
+  // Poll so payments captured on other devices/accounts show up without
+  // needing to close and reopen the app. Skipped while "Pausar captura" is
+  // on, since polling every 10s is the main background battery/data cost.
+  useEffect(() => {
+    if (!user || !preferences.captureActive) return;
+    const interval = setInterval(() => {
+      refreshTransactions().catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [user, preferences.captureActive, refreshTransactions]);
+
   const value = useMemo<PaymentsCtxValue>(() => ({
     transactions,
     hydrated,
@@ -153,6 +170,8 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     setPlinBank: (bank, v) => setIntegrations(prev => ({ ...prev, plinBanks: { ...prev.plinBanks, [bank]: v } })),
     preferences,
     setVoiceEnabled: (v) => setPreferences(prev => ({ ...prev, voiceEnabled: v })),
+    setPushEnabled: (v) => setPreferences(prev => ({ ...prev, pushEnabled: v })),
+    setCaptureActive: (v) => setPreferences(prev => ({ ...prev, captureActive: v })),
   }), [transactions, hydrated, refreshTransactions, integrations, preferences]);
 
   return <PaymentsContext.Provider value={value}>{children}</PaymentsContext.Provider>;
@@ -175,6 +194,6 @@ export function useIntegrations() {
 }
 
 export function usePreferences() {
-  const { preferences, setVoiceEnabled } = usePaymentsContext();
-  return { preferences, setVoiceEnabled };
+  const { preferences, setVoiceEnabled, setPushEnabled, setCaptureActive } = usePaymentsContext();
+  return { preferences, setVoiceEnabled, setPushEnabled, setCaptureActive };
 }

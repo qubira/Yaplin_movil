@@ -10,6 +10,7 @@ import { useIntegrations, usePreferences, PlinBank } from '../../store/PaymentsS
 import { useDefaultStore } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
 import { isNotificationAccessGranted, openNotificationAccessSettings } from '../../services/androidNotificationAccess';
+import { requestPushPermission } from '../../services/pushNotifications';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import ThemeToggle from '../../components/ui/ThemeToggle';
@@ -79,10 +80,17 @@ function SectionTitle({ title }: { title: string }) {
 export default function SettingsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const [pushEnabled,    setPushEnabled]    = useState(true);
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const { integrations, setYape, setIzipay, setPlinBank } = useIntegrations();
-  const { preferences, setVoiceEnabled } = usePreferences();
+  const { preferences, setVoiceEnabled, setPushEnabled, setCaptureActive } = usePreferences();
+
+  async function togglePush(v: boolean) {
+    if (v) {
+      const granted = await requestPushPermission();
+      if (!granted) return;
+    }
+    setPushEnabled(v);
+  }
   const { defaultStoreId, setDefaultStoreId, stores } = useDefaultStore();
   const { user, logout } = useAuth();
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -167,10 +175,26 @@ export default function SettingsScreen() {
             Los pagos que este celular capture se suman a la tienda predeterminada.
           </Text>
 
+          {/* Batería */}
+          <SectionTitle title="Batería" />
+          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+            <ToggleRow
+              icon="battery-charging-outline"
+              label="Captura activa"
+              value={preferences.captureActive}
+              onValueChange={setCaptureActive}
+            />
+          </View>
+          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 8, paddingHorizontal: 4 }}>
+            {preferences.captureActive
+              ? 'YapLin revisa pagos nuevos cada 10 segundos y escucha las notificaciones de Yape/Plin/Izipay. Desactívalo cuando no estés atendiendo para ahorrar batería.'
+              : 'Captura en pausa: no se sincroniza ni se leen notificaciones de pago. Actívalo antes de empezar a atender.'}
+          </Text>
+
           {/* Notificaciones */}
           <SectionTitle title="Notificaciones" />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
-            <ToggleRow icon="notifications-outline" label="Notificaciones push" value={pushEnabled} onValueChange={setPushEnabled} />
+            <ToggleRow icon="notifications-outline" label="Notificaciones push" value={preferences.pushEnabled} onValueChange={togglePush} />
             <ToggleRow icon="chatbubble-ellipses-outline" label="WhatsApp" value={whatsappEnabled} onValueChange={setWhatsappEnabled} />
             <ToggleRow icon="volume-medium-outline" label="Alerta de voz" value={preferences.voiceEnabled} onValueChange={setVoiceEnabled} />
           </View>

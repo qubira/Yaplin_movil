@@ -14,7 +14,7 @@ import ThemeToggle from '../../components/ui/ThemeToggle';
 export default function AuthScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, login } = useAuth();
+  const { user, login, logoutReason, clearLogoutReason } = useAuth();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
@@ -28,6 +28,7 @@ export default function AuthScreen() {
       return;
     }
     setError('');
+    clearLogoutReason();
     setLoading(true);
     try {
       await login(email.trim(), password);
@@ -79,6 +80,11 @@ export default function AuthScreen() {
               <Input label="Contraseña" placeholder="••••••••" value={password} onChangeText={setPassword} isPassword leftIcon="lock-closed-outline" />
             </View>
 
+            {!!logoutReason && !error && (
+              <Text style={{ color: c.WARNING, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 8 }}>
+                {logoutReason}
+              </Text>
+            )}
             {!!error && (
               <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 8 }}>{error}</Text>
             )}
@@ -102,7 +108,7 @@ export default function AuthScreen() {
 
             <TouchableOpacity onPress={() => router.push('/(auth)/register')} style={{ marginTop: 20, alignItems: 'center' }}>
               <Text style={{ color: c.ACCENT_CYAN, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
-                ¿Primera vez? Crea tu negocio
+                ¿Primera vez? Cómo crear tu negocio
               </Text>
             </TouchableOpacity>
 

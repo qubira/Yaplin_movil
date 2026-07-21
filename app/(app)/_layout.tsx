@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthStore';
+import SubscriptionBanner from '../../components/ui/SubscriptionBanner';
 
 interface TabIconProps {
   name: keyof typeof Ionicons.glyphMap;
@@ -32,56 +33,59 @@ export default function AppLayout() {
   if (hydrated && !user) return <Redirect href="/(auth)" />;
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: c.BACKGROUND_CARD,
-          borderTopColor: c.BORDER,
-          borderTopWidth: 1,
-          height: 56 + insets.bottom,
-          paddingBottom: insets.bottom,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: c.ACCENT_PURPLE,
-        tabBarInactiveTintColor: c.TEXT_SECONDARY,
-        tabBarShowLabel: false,
-        tabBarItemStyle: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-      }}
-    >
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? 'grid' : 'grid-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
-          ),
+    <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
+      <SubscriptionBanner subscription={user?.subscription} />
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: c.BACKGROUND_CARD,
+            borderTopColor: c.BORDER,
+            borderTopWidth: 1,
+            height: 56 + insets.bottom,
+            paddingBottom: insets.bottom,
+            paddingTop: 8,
+          },
+          tabBarActiveTintColor: c.ACCENT_PURPLE,
+          tabBarInactiveTintColor: c.TEXT_SECONDARY,
+          tabBarShowLabel: false,
+          tabBarItemStyle: { flex: 1, alignItems: 'center', justifyContent: 'center' },
         }}
-      />
-      <Tabs.Screen
-        name="stores"
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? 'business' : 'business-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="team"
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? 'settings' : 'settings-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
-          ),
-        }}
-      />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="dashboard"
+          options={{
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon name={focused ? 'grid' : 'grid-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="stores"
+          options={{
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon name={focused ? 'business' : 'business-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="team"
+          options={{
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon name={focused ? 'settings' : 'settings-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
+            ),
+          }}
+        />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
+      </Tabs>
+    </View>
   );
 }

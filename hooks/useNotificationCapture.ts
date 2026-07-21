@@ -10,6 +10,8 @@ import {
   PLIN_BANK_PACKAGES,
 } from '../services/notificationParser';
 import { announcePayment } from '../services/speech';
+import { notifyPaymentReceived, requestPushPermission } from '../services/pushNotifications';
+import { scheduleSessionExpiryReminder } from '../services/sessionReminder';
 import { api } from '../services/api';
 import { enqueueOfflineTransaction, getQueuedTransactions, clearOfflineQueue, QueuedTransactionPayload } from '../services/offlineQueue';
 
@@ -33,6 +35,16 @@ export function useNotificationCapture() {
   useEffect(() => {
     voiceEnabledRef.current = preferences.voiceEnabled;
   }, [preferences.voiceEnabled]);
+
+  const pushEnabledRef = useRef(preferences.pushEnabled);
+  useEffect(() => {
+    pushEnabledRef.current = preferences.pushEnabled;
+  }, [preferences.pushEnabled]);
+
+  const captureActiveRef = useRef(preferences.captureActive);
+  useEffect(() => {
+    captureActiveRef.current = preferences.captureActive;
+  }, [preferences.captureActive]);
 
   const defaultStoreIdRef = useRef(defaultStoreId);
   useEffect(() => {
@@ -71,8 +83,26 @@ export function useNotificationCapture() {
     return () => subscription.remove();
   }, []);
 
+  // Every time the app opens (or comes back to foreground), reset the 24h
+  // "come back and reopen" reminder — see services/sessionReminder.ts.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    async function resetReminder() {
+      await requestPushPermission();
+      await scheduleSessionExpiryReminder();
+    }
+    resetReminder();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') resetReminder();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // Empty package list while paused: the native side skips its
+  // isPackageAllowed check up front (see ExpoAndroidNotificationListenerService.kt),
+  // so paused notifications never even cross the JS bridge.
   const allowedPackages = useMemo(() => {
-    if (Platform.OS !== 'android') return [] as string[];
+    if (Platform.OS !== 'android' || !preferences.captureActive) return [] as string[];
     const packages: string[] = [];
     if (integrations.yape) packages.push(YAPE_PACKAGE);
     if (integrations.izipay) packages.push(IZIPAY_PACKAGE);
@@ -80,7 +110,7 @@ export function useNotificationCapture() {
       if (integrations.plinBanks[bank]) packages.push(PLIN_BANK_PACKAGES[bank]);
     });
     return packages;
-  }, [integrations]);
+  }, [integrations, preferences.captureActive]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -97,6 +127,7 @@ export function useNotificationCapture() {
       const subscription = getNativeListener().addListener(
         'onNotificationReceived',
         (event: RawNotification) => {
+          if (!captureActiveRef.current) return;
           if (__DEV__) console.log('[YapLin] raw notification:', JSON.stringify(event));
           const transaction = parseNotification(event);
           if (!transaction) return;
@@ -105,6 +136,7 @@ export function useNotificationCapture() {
           transaction.storeId = storeId;
 
           if (voiceEnabledRef.current) announcePayment(transaction);
+          if (pushEnabledRef.current) notifyPaymentReceived(transaction);
 
           addTransaction(transaction).catch(() => {
             enqueueOfflineTransaction({
