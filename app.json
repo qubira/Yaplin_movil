@@ -43,6 +43,15 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c38edae3-3d8e-4d7e-9c6f-fb3f54966fc9"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c38edae3-3d8e-4d7e-9c6f-fb3f54966fc9"
     }
   }
 }
