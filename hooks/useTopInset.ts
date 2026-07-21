@@ -3,13 +3,16 @@ import { useAuth } from '../store/AuthStore';
 import { isSubscriptionBannerVisible } from '../components/ui/SubscriptionBanner';
 
 /**
- * Top padding for tab screens. The subscription banner (rendered once,
- * above the tab navigator) already reserves the status-bar area when it's
- * visible — screens must not add insets.top on top of it or the header
- * ends up pushed down twice.
+ * Full top padding for a tab screen's header, given the padding it would
+ * normally add below the status bar (e.g. 16-24). The subscription banner
+ * (rendered once, above the tab navigator) already reserves the status-bar
+ * area and its own bottom padding when visible, so screens must not stack
+ * insets.top + their usual gap on top of it — that doubles the space and
+ * leaves the header looking detached from the banner. When the banner is
+ * showing, collapse down to a small fixed gap instead.
  */
-export function useTopInset(): number {
+export function useTopInset(basePadding: number): number {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  return isSubscriptionBannerVisible(user?.subscription) ? 0 : insets.top;
+  return isSubscriptionBannerVisible(user?.subscription) ? 8 : insets.top + basePadding;
 }

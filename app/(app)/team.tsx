@@ -190,7 +190,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
 export default function TeamScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const topInset = useTopInset();
+  const topInset = useTopInset(16);
   const { team, addMember, updateMember, removeMember } = useTeam();
   const { stores } = useStores();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -217,7 +217,7 @@ export default function TeamScreen() {
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: topInset + 16, borderBottomColor: c.BORDER }]}>
+      <View style={[s.header, { paddingTop: topInset, borderBottomColor: c.BORDER }]}>
         <View>
           <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY }]}>Mi equipo</Text>
           <Text style={[s.headerSub, { color: c.TEXT_SECONDARY }]}>{active} activos · {team.length} total</Text>

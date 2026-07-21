@@ -110,7 +110,7 @@ function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }
 export default function DashboardScreen() {
   const { c: Colors, toggle } = useTheme();
   const insets = useSafeAreaInsets();
-  const topInset = useTopInset();
+  const topInset = useTopInset(20);
   const hoy = new Date();
 
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
@@ -169,7 +169,7 @@ export default function DashboardScreen() {
 
       {/* Header */}
       <View style={{
-        paddingTop: topInset + 20, paddingHorizontal: 24, paddingBottom: 20,
+        paddingTop: topInset, paddingHorizontal: 24, paddingBottom: 20,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
