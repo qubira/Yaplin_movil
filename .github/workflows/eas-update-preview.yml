@@ -40,4 +40,11 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Publish update to the "preview" channel
-        run: eas update --channel preview --environment preview --message "Auto-publish desde ${{ github.sha }}" --non-interactive
+        # --platform is android|ios|all (no dedicated "web" value), and "all"
+        # still makes the underlying `expo export` bundle for every platform
+        # declared in app.json — including web, which this project doesn't
+        # ship and doesn't have react-native-web installed for. Publish the
+        # two native platforms explicitly instead.
+        run: |
+          eas update --channel preview --environment preview --platform android --message "Auto-publish desde ${{ github.sha }}" --non-interactive
+          eas update --channel preview --environment preview --platform ios --message "Auto-publish desde ${{ github.sha }}" --non-interactive

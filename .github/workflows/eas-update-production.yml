@@ -46,4 +46,8 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Publish update to the "production" channel
-        run: eas update --channel production --environment production --message "${{ github.event.inputs.message }}" --non-interactive
+        # See the "preview" workflow for why this is split into two
+        # per-platform calls instead of --platform all.
+        run: |
+          eas update --channel production --environment production --platform android --message "${{ github.event.inputs.message }}" --non-interactive
+          eas update --channel production --environment production --platform ios --message "${{ github.event.inputs.message }}" --non-interactive
