@@ -139,12 +139,12 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
 
   // Poll so payments captured on other devices/accounts show up without
   // needing to close and reopen the app. Skipped while "Pausar captura" is
-  // on, since polling every 10s is the main background battery/data cost.
+  // on, since polling every 5s is the main background battery/data cost.
   useEffect(() => {
     if (!user || !preferences.captureActive) return;
     const interval = setInterval(() => {
       refreshTransactions().catch(() => {});
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [user, preferences.captureActive, refreshTransactions]);
 
