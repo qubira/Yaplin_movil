@@ -186,16 +186,15 @@ export default function TransactionDetailScreen() {
     ].join('\n');
     const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
+    // Go straight for openURL instead of gating on canOpenURL first: on
+    // Android 11+, package-visibility restrictions make canOpenURL return
+    // false for mailto even when a mail app IS installed and would open
+    // fine, so a pre-check here produces false negatives.
     try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-        return;
-      }
+      await Linking.openURL(url);
     } catch {
-      // fall through to the manual fallback below
+      setSupportModal(true);
     }
-    setSupportModal(true);
   };
 
   return (

@@ -102,9 +102,19 @@ router.put('/:id', requireOwner, async (req, res) => {
   if (active !== undefined) data.active = active;
   if (password) data.passwordHash = await bcrypt.hash(password, 10);
 
+  const fieldChanges: Record<string, { old: string | null; new: string | null }> = {};
+  if (name !== undefined && name !== existing.name) fieldChanges.name = { old: existing.name, new: name };
+  if (email !== undefined && email !== existing.email) fieldChanges.email = { old: existing.email, new: email };
+  if (role !== undefined && role !== existing.role) fieldChanges.role = { old: existing.role, new: role };
+  if (storeId !== undefined && (data.storeId as string | null) !== existing.storeId) {
+    fieldChanges.storeId = { old: existing.storeId, new: data.storeId as string | null };
+  }
+
   try {
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.user.update({ where: { id: existing.id }, data });
+      const ipAddress = requestIp(req);
+      const userAgent = req.headers['user-agent'] ?? null;
 
       if (active !== undefined && active !== existing.active) {
         await writeAuditLog(tx, {
@@ -116,8 +126,37 @@ router.put('/:id', requireOwner, async (req, res) => {
           summary: `${req.auth!.email} ${active ? 'activó' : 'desactivó'} al usuario ${existing.email}.`,
           changes: { active: { old: existing.active, new: active } },
           origin: AUDIT_ORIGIN.MOBILE,
-          ipAddress: requestIp(req),
-          userAgent: req.headers['user-agent'] ?? null,
+          ipAddress,
+          userAgent,
+        });
+      }
+
+      if (password) {
+        await writeAuditLog(tx, {
+          actorEmail: req.auth!.email,
+          action: 'PASSWORD_RESET',
+          entityType: 'User',
+          entityId: existing.id,
+          businessId: req.auth!.businessId,
+          summary: `${req.auth!.email} restableció la contraseña de ${existing.email}.`,
+          origin: AUDIT_ORIGIN.MOBILE,
+          ipAddress,
+          userAgent,
+        });
+      }
+
+      if (Object.keys(fieldChanges).length > 0) {
+        await writeAuditLog(tx, {
+          actorEmail: req.auth!.email,
+          action: 'UPDATE',
+          entityType: 'User',
+          entityId: existing.id,
+          businessId: req.auth!.businessId,
+          summary: `${req.auth!.email} actualizó datos de ${existing.email} (${Object.keys(fieldChanges).join(', ')}).`,
+          changes: fieldChanges,
+          origin: AUDIT_ORIGIN.MOBILE,
+          ipAddress,
+          userAgent,
         });
       }
 
