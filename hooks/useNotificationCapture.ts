@@ -58,6 +58,18 @@ export function useNotificationCapture() {
     defaultStoreIdRef.current = defaultStoreId;
   }, [defaultStoreId]);
 
+  // addTransaction is redefined every ~10s by the background transactions
+  // poll in PaymentsStore (it's part of that store's single memoized value,
+  // which changes whenever `transactions` does). Reading it through a ref
+  // — instead of listing it as this effect's dependency below — keeps the
+  // native listener subscription mounted once instead of being torn down
+  // and re-added every 10 seconds, which was silently dropping real Yape
+  // notifications that arrived during the gap between unsubscribe/resubscribe.
+  const addTransactionRef = useRef(addTransaction);
+  useEffect(() => {
+    addTransactionRef.current = addTransaction;
+  }, [addTransaction]);
+
   // Flush any payments that failed to reach the server (no connectivity at
   // capture time) whenever the app comes back to the foreground.
   const refreshRef = useRef(refreshTransactions);
@@ -146,7 +158,7 @@ export function useNotificationCapture() {
           if (voiceEnabledRef.current) announcePayment(transaction);
           if (pushEnabledRef.current) notifyPaymentReceived(transaction);
 
-          addTransaction(transaction).catch(() => {
+          addTransactionRef.current(transaction).catch(() => {
             enqueueOfflineTransaction({
               storeId,
               payerName: transaction.payerName,
@@ -164,5 +176,5 @@ export function useNotificationCapture() {
     } catch (e) {
       if (__DEV__) console.log('[YapLin] addListener ERROR', String(e));
     }
-  }, [addTransaction]);
+  }, []);
 }
