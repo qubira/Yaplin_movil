@@ -21,6 +21,7 @@ export interface AuthUser {
   storeId: string | null;
   active: boolean;
   businessId: string;
+  businessName: string;
   subscription?: SubscriptionSummary | null;
 }
 

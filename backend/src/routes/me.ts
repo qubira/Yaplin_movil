@@ -6,7 +6,10 @@ import { getSubscriptionSummary } from '../subscription';
 const router = Router();
 
 router.get('/', requireAuth, async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.auth!.userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: req.auth!.userId },
+    include: { business: { select: { name: true } } },
+  });
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
   const subscription = await getSubscriptionSummary(user.businessId);
@@ -14,6 +17,7 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({
     id: user.id, email: user.email, name: user.name, initials: user.initials,
     role: user.role, storeId: user.storeId, active: user.active, businessId: user.businessId,
+    businessName: user.business.name,
     subscription,
   });
 });

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db';
 import { requireAuth } from '../auth';
+import { AUDIT_ORIGIN, requestIp, writeAuditLog } from '../audit';
 
 const router = Router();
 router.use(requireAuth);
@@ -61,10 +62,36 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  const txn = await prisma.transaction.findFirst({ where: { id: req.params.id, store: { businessId: req.auth!.businessId } } });
-  if (!txn) return res.status(404).json({ error: 'Pago no encontrado' });
+  const notFound = await prisma
+    .$transaction(async (tx) => {
+      // Read, capture in the audit log, then delete — all inside one
+      // transaction so the audited data is exactly what got removed, and
+      // a failure anywhere rolls back the whole operation (nothing is
+      // deleted without being audited, and nothing is audited without
+      // actually being deleted).
+      const txn = await tx.transaction.findFirst({
+        where: { id: req.params.id, store: { businessId: req.auth!.businessId } },
+      });
+      if (!txn) return true;
 
-  await prisma.transaction.delete({ where: { id: txn.id } });
+      await writeAuditLog(tx, {
+        actorEmail: req.auth!.email,
+        action: 'DELETE',
+        entityType: 'Transaction',
+        entityId: txn.id,
+        businessId: req.auth!.businessId,
+        summary: `${req.auth!.email} eliminó un pago de ${txn.payerName} por S/ ${Number(txn.amount).toFixed(2)} (${txn.method}, ref. ${txn.reference}).`,
+        changes: { deleted: { old: toPublic(txn), new: null } },
+        origin: AUDIT_ORIGIN.MOBILE,
+        ipAddress: requestIp(req),
+        userAgent: req.headers['user-agent'] ?? null,
+      });
+
+      await tx.transaction.delete({ where: { id: txn.id } });
+      return false;
+    });
+
+  if (notFound) return res.status(404).json({ error: 'Pago no encontrado' });
   res.status(204).send();
 });
 

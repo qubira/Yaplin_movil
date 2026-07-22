@@ -12,10 +12,14 @@ export interface AuthPayload {
   storeId: string | null;
 }
 
+export interface AuthContext extends AuthPayload {
+  email: string;
+}
+
 declare global {
   namespace Express {
     interface Request {
-      auth?: AuthPayload;
+      auth?: AuthContext;
     }
   }
 }
@@ -48,7 +52,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return res.status(403).json({ error: message, code: access.code });
     }
 
-    req.auth = payload;
+    req.auth = { ...payload, email: user.email };
     next();
   } catch (err) {
     console.error('requireAuth check failed:', err);

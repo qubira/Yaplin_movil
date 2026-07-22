@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../db';
 import { signToken } from '../auth';
 import { checkBusinessAccess, getSubscriptionSummary, type SubscriptionSummary } from '../subscription';
+import { normalizeEmail } from '../audit';
 
 const router = Router();
 
@@ -16,12 +17,14 @@ function toPublicUser(
     storeId: string | null;
     active: boolean;
     businessId: string;
+    business: { name: string };
   },
   subscription: SubscriptionSummary | null
 ) {
   return {
     id: user.id, email: user.email, name: user.name, initials: user.initials,
     role: user.role, storeId: user.storeId, active: user.active, businessId: user.businessId,
+    businessName: user.business.name,
     subscription,
   };
 }
@@ -34,10 +37,11 @@ router.post('/register', (_req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body ?? {};
-  if (!email || !password) return res.status(400).json({ error: 'Faltan credenciales' });
+  const { email: rawEmail, password } = req.body ?? {};
+  if (!rawEmail || !password) return res.status(400).json({ error: 'Faltan credenciales' });
+  const email = normalizeEmail(rawEmail);
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, include: { business: { select: { name: true } } } });
   if (!user) return res.status(401).json({ error: 'Credenciales inválidas' });
 
   const valid = await bcrypt.compare(password, user.passwordHash);

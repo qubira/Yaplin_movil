@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Share, Image,
-  Modal, LayoutAnimation, Platform, UIManager,
+  Modal, LayoutAnimation, Platform, UIManager, Linking,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +12,11 @@ import { PaymentColors } from '../../../constants/colors';
 import { useTheme } from '../../../constants/theme';
 import { formatAmount, formatDate, formatTime, Transaction } from '../../../mocks/transactions';
 import { useTransactions } from '../../../store/PaymentsStore';
+import { useStores } from '../../../store/StoresStore';
+import { useAuth } from '../../../store/AuthStore';
 import Avatar from '../../../components/ui/Avatar';
+
+const SUPPORT_EMAIL = 'qubirasac@gmail.com';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 
@@ -84,11 +88,14 @@ export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { transactions } = useTransactions();
+  const { stores } = useStores();
+  const { user } = useAuth();
   const transaction = transactions.find(t => t.id === id);
 
   const [historyModal, setHistoryModal] = useState(false);
   const [filterKey, setFilterKey]       = useState<string>('all');
   const [collapsed, setCollapsed]       = useState<Set<string>>(new Set());
+  const [supportModal, setSupportModal] = useState(false);
 
   const history = useMemo(() =>
     transaction
@@ -161,6 +168,34 @@ export default function TransactionDetailScreen() {
 
   const handleShare = async () => {
     await Share.share({ message: `Comprobante YapLin\n${transaction.payerName} pagó ${formatAmount(transaction.amount)} vía ${brand.label}\nRef: ${transaction.reference}\nFecha: ${formatDate(transaction.timestamp)} ${formatTime(transaction.timestamp)}` });
+  };
+
+  const handleReportProblem = async () => {
+    const storeName = stores.find(s => s.id === transaction.storeId)?.name ?? '—';
+    const subject = `Reporte de problema - Pago ${transaction.reference}`;
+    const body = [
+      `Negocio: ${user?.businessName ?? '—'} — Tienda: ${storeName}`,
+      `Método de pago: ${brand.label}`,
+      `Monto: ${formatAmount(transaction.amount)}`,
+      `Fecha y hora: ${formatDate(transaction.timestamp)} ${formatTime(transaction.timestamp)}`,
+      `Referencia: ${transaction.reference}`,
+      `Reportado por: ${user?.name ?? '—'} (${user?.email ?? '—'})`,
+      '',
+      'Descripción del problema:',
+      '(escribe aquí los detalles)',
+    ].join('\n');
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+        return;
+      }
+    } catch {
+      // fall through to the manual fallback below
+    }
+    setSupportModal(true);
   };
 
   return (
@@ -258,7 +293,7 @@ export default function TransactionDetailScreen() {
             <Ionicons name="share-outline" size={20} color={c.ACCENT_CYAN} />
             <Text style={{ color: c.ACCENT_CYAN, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Compartir comprobante</Text>
           </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.85}
+          <TouchableOpacity onPress={handleReportProblem} activeOpacity={0.85}
             style={{ height: 56, borderRadius: 18, backgroundColor: `${c.ACCENT_RED}11`, borderWidth: 1, borderColor: `${c.ACCENT_RED}33`, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <Ionicons name="flag-outline" size={20} color={c.ACCENT_RED} />
             <Text style={{ color: c.ACCENT_RED, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Reportar problema</Text>
@@ -390,6 +425,29 @@ export default function TransactionDetailScreen() {
             )}
 
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ══ FALLBACK: no mail app configured ══ */}
+      <Modal visible={supportModal} transparent animationType="fade" onRequestClose={() => setSupportModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 32 }}>
+          <View style={{ width: '100%', backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 24 }}>
+            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
+              No encontramos una app de correo
+            </Text>
+            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20, marginBottom: 16 }}>
+              Escribe directamente a soporte con los detalles de este pago:
+            </Text>
+            <View style={{ backgroundColor: c.BACKGROUND_CARD_2, borderRadius: 14, borderWidth: 1, borderColor: c.BORDER, padding: 14, marginBottom: 20 }}>
+              <Text selectable style={{ color: c.ACCENT_CYAN, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textAlign: 'center' }}>
+                {SUPPORT_EMAIL}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setSupportModal(false)} activeOpacity={0.85}
+              style={{ height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>

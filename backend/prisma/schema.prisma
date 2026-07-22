@@ -116,3 +116,30 @@ model Subscription {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @default(now())
 }
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  SUSPEND
+  REACTIVATE
+  PASSWORD_RESET
+  DELETE
+  RENEW
+  EXPIRE
+}
+
+model AuditLog {
+  id         String      @id @default(dbgenerated("gen_random_uuid()::text"))
+  createdAt  DateTime    @default(now())
+  adminId    String?
+  adminEmail String
+  action     AuditAction
+  entityType String
+  entityId   String
+  businessId String?
+  summary    String
+  changes    Json?
+  ipAddress  String?
+  userAgent  String?
+  origin     String?
+}
