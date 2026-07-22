@@ -26,6 +26,11 @@ function withForegroundListener(config) {
       $: {
         'android:name': LISTENER_SERVICE_NAME,
         'android:foregroundServiceType': 'specialUse',
+        // Without this, Android's default behavior kills the whole app
+        // process — listener service included — the moment the user swipes
+        // YapLin away from Recents, regardless of the foreground promotion
+        // above. This is what actually keeps it listening while "closed".
+        'android:stopWithTask': 'false',
         'tools:node': 'merge',
       },
       property: [

@@ -1,5 +1,5 @@
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-index 77e247a..c9108ff 100644
+index 77e247a..ab540b5 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
 @@ -1,11 +1,16 @@
@@ -22,13 +22,21 @@ index 77e247a..c9108ff 100644
  import java.io.File
  import java.io.FileOutputStream
  
-@@ -13,6 +18,68 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -13,6 +18,100 @@ class ExpoNotificationListenerService : NotificationListenerService() {
      private var lastNotificationKey: String? = null
      private var lastNotificationTime: Long = 0
  
 +    companion object {
 +        private const val FOREGROUND_CHANNEL_ID = "yaplin_listening_channel"
 +        private const val FOREGROUND_NOTIFICATION_ID = 7738
++
++        // Tracks the connected instance so the module can call
++        // getActiveNotifications() on it — only valid while actually
++        // connected, hence set/cleared alongside the foreground promotion.
++        @Volatile
++        private var instance: ExpoNotificationListenerService? = null
++
++        fun getInstance(): ExpoNotificationListenerService? = instance
 +    }
 +
 +    // Promotes this service to the foreground with a persistent, low-priority
@@ -37,6 +45,7 @@ index 77e247a..c9108ff 100644
 +    // idle); foreground services get much stronger protection from the OS.
 +    override fun onListenerConnected() {
 +        super.onListenerConnected()
++        instance = this
 +        try {
 +            val manager = getSystemService(NotificationManager::class.java)
 +            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -81,6 +90,7 @@ index 77e247a..c9108ff 100644
 +
 +    override fun onListenerDisconnected() {
 +        super.onListenerDisconnected()
++        instance = null
 +        try {
 +            stopForeground(STOP_FOREGROUND_REMOVE)
 +        } catch (e: Exception) {
@@ -88,6 +98,81 @@ index 77e247a..c9108ff 100644
 +        }
 +    }
 +
++    // Text-only fields (no icon file I/O) for re-parsing notifications that
++    // are still sitting in the shade from before the listener connected —
++    // used to backfill payments that arrived while the app/service was
++    // killed. Kept separate from onNotificationPosted's richer map so this
++    // stays cheap to call for a whole batch at once.
++    fun buildBasicNotificationData(sbn: StatusBarNotification): Map<String, Any> {
++        val extras = sbn.notification.extras
++        return mapOf(
++            "packageName" to sbn.packageName,
++            "id" to sbn.id,
++            "title" to (extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""),
++            "text" to (extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""),
++            "bigText" to (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""),
++            "subText" to (extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""),
++            "summaryText" to (extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString() ?: ""),
++            "postTime" to sbn.postTime,
++            "key" to sbn.key,
++            "appName" to "",
++            "appIconPath" to ""
++        )
++    }
++
      override fun onNotificationPosted(sbn: StatusBarNotification) {
          val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return
          
+diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
+index 8c92037..d1de07e 100644
+--- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
++++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
+@@ -54,6 +54,24 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+         Function("setAllowedPackages") { packages: List<String> ->
+             allowedPackages = packages.toSet()
+         }
++
++        // Notifications still present in the shade at the moment the
++        // listener (re)connects — e.g. because the app/service had been
++        // killed and just restarted. Lets JS backfill payments that were
++        // missed while nothing was listening, instead of only relying on
++        // live onNotificationPosted events.
++        Function("getRecentNotifications") {
++            val service = ExpoNotificationListenerService.getInstance()
++                ?: return@Function emptyList<Map<String, Any>>()
++            try {
++                service.activeNotifications
++                    .filter { isPackageAllowed(it.packageName) }
++                    .map { service.buildBasicNotificationData(it) }
++            } catch (e: Exception) {
++                e.printStackTrace()
++                emptyList<Map<String, Any>>()
++            }
++        }
+     }
+ 
+     companion object {
+diff --git a/node_modules/expo-android-notification-listener-service/build/ExpoAndroidNotificationListenerServiceModule.d.ts b/node_modules/expo-android-notification-listener-service/build/ExpoAndroidNotificationListenerServiceModule.d.ts
+index 26fc41b..c9d8608 100644
+--- a/node_modules/expo-android-notification-listener-service/build/ExpoAndroidNotificationListenerServiceModule.d.ts
++++ b/node_modules/expo-android-notification-listener-service/build/ExpoAndroidNotificationListenerServiceModule.d.ts
+@@ -19,6 +19,7 @@ declare class ExpoAndroidNotificationListenerServiceModule extends EventEmitter<
+     isNotificationPermissionGranted(): boolean;
+     openNotificationListenerSettings(): void;
+     setAllowedPackages(packages: string[]): void;
++    getRecentNotifications(): NotificationData[];
+ }
+ declare const _default: ExpoAndroidNotificationListenerServiceModule;
+ export default _default;
+diff --git a/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts b/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts
+index 8480382..d7ae6fc 100644
+--- a/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts
++++ b/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts
+@@ -22,6 +22,7 @@ declare class ExpoAndroidNotificationListenerServiceModule extends EventEmitter<
+   isNotificationPermissionGranted(): boolean;
+   openNotificationListenerSettings(): void;
+   setAllowedPackages(packages: string[]): void;
++  getRecentNotifications(): NotificationData[];
+ }
+ 
+ export default requireNativeModule<ExpoAndroidNotificationListenerServiceModule>(

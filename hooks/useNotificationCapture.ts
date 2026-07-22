@@ -27,7 +27,7 @@ function getNativeListener() {
  * notification into the shared PaymentsStore.
  */
 export function useNotificationCapture() {
-  const { addTransaction, refreshTransactions } = useTransactions();
+  const { transactions, addTransaction, refreshTransactions } = useTransactions();
   const { integrations } = useIntegrations();
   const { preferences } = usePreferences();
   const { defaultStoreId } = useDefaultStore();
@@ -69,6 +69,13 @@ export function useNotificationCapture() {
   useEffect(() => {
     addTransactionRef.current = addTransaction;
   }, [addTransaction]);
+
+  // References already registered — used to dedupe the shade-reconciliation
+  // pass below against payments the live listener already captured.
+  const referencesRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    referencesRef.current = new Set(transactions.map(t => t.reference));
+  }, [transactions]);
 
   // Flush any payments that failed to reach the server (no connectivity at
   // capture time) whenever the app comes back to the foreground.
@@ -141,6 +148,32 @@ export function useNotificationCapture() {
     }
   }, [allowedPackages]);
 
+  // Shared by the live listener below and the shade-reconciliation pass
+  // further down — everything after "we have a parsed transaction with a
+  // store" is identical either way.
+  const registerTransaction = useRef((transaction: ReturnType<typeof parseNotification>) => {
+    if (!transaction) return;
+    const storeId = defaultStoreIdRef.current;
+    if (!storeId) return;
+    transaction.storeId = storeId;
+
+    if (voiceEnabledRef.current) announcePayment(transaction);
+    if (pushEnabledRef.current) notifyPaymentReceived(transaction);
+
+    addTransactionRef.current(transaction).catch(() => {
+      enqueueOfflineTransaction({
+        storeId,
+        payerName: transaction.payerName,
+        payerInitials: transaction.payerInitials,
+        amount: transaction.amount,
+        method: transaction.method,
+        timestamp: transaction.timestamp.toISOString(),
+        reference: transaction.reference,
+        status: transaction.status,
+      });
+    });
+  }).current;
+
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     try {
@@ -149,27 +182,7 @@ export function useNotificationCapture() {
         (event: RawNotification) => {
           if (!captureActiveRef.current || !userRef.current) return;
           if (__DEV__) console.log('[YapLin] raw notification:', JSON.stringify(event));
-          const transaction = parseNotification(event);
-          if (!transaction) return;
-          const storeId = defaultStoreIdRef.current;
-          if (!storeId) return;
-          transaction.storeId = storeId;
-
-          if (voiceEnabledRef.current) announcePayment(transaction);
-          if (pushEnabledRef.current) notifyPaymentReceived(transaction);
-
-          addTransactionRef.current(transaction).catch(() => {
-            enqueueOfflineTransaction({
-              storeId,
-              payerName: transaction.payerName,
-              payerInitials: transaction.payerInitials,
-              amount: transaction.amount,
-              method: transaction.method,
-              timestamp: transaction.timestamp.toISOString(),
-              reference: transaction.reference,
-              status: transaction.status,
-            });
-          });
+          registerTransaction(parseNotification(event));
         }
       );
       return () => subscription.remove();
@@ -177,4 +190,36 @@ export function useNotificationCapture() {
       if (__DEV__) console.log('[YapLin] addListener ERROR', String(e));
     }
   }, []);
+
+  // Safety net for when Android kills the listener anyway (some OEMs do
+  // this despite stopWithTask="false" + foreground promotion): on every
+  // foreground transition, re-read whatever Yape/Plin/Izipay notifications
+  // are still sitting in the shade and register any whose reference isn't
+  // already in our transaction list. Grouped/collapsed notifications in the
+  // shade still carry their own individual text when read this way, so this
+  // catches payments even if several arrived stacked under one summary.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    function reconcileFromShade() {
+      if (!captureActiveRef.current || !userRef.current) return;
+      try {
+        const recent: RawNotification[] = getNativeListener().getRecentNotifications();
+        recent.forEach((event) => {
+          const transaction = parseNotification(event);
+          if (!transaction || referencesRef.current.has(transaction.reference)) return;
+          if (__DEV__) console.log('[YapLin] backfilling from shade:', JSON.stringify(event));
+          registerTransaction(transaction);
+        });
+      } catch (e) {
+        if (__DEV__) console.log('[YapLin] getRecentNotifications ERROR', String(e));
+      }
+    }
+
+    reconcileFromShade();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') reconcileFromShade();
+    });
+    return () => subscription.remove();
+  }, [registerTransaction]);
 }
