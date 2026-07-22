@@ -176,7 +176,26 @@ router.delete('/:id', requireOwner, async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Miembro no encontrado' });
   if (existing.id === req.auth!.userId) return res.status(400).json({ error: 'No puedes eliminarte a ti mismo' });
 
-  await prisma.user.delete({ where: { id: existing.id } });
+  // Audit before deleting, in the same transaction, so the log keeps the
+  // full record (email, role, store) of exactly who got removed, and a
+  // failure here rolls back the delete instead of losing the trail.
+  await prisma.$transaction(async (tx) => {
+    await writeAuditLog(tx, {
+      actorEmail: req.auth!.email,
+      action: 'DELETE',
+      entityType: 'User',
+      entityId: existing.id,
+      businessId: req.auth!.businessId,
+      summary: `${req.auth!.email} eliminó al usuario ${existing.email} (${existing.role}).`,
+      changes: { deleted: { old: toPublicUser(existing), new: null } },
+      origin: AUDIT_ORIGIN.MOBILE,
+      ipAddress: requestIp(req),
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+
+    await tx.user.delete({ where: { id: existing.id } });
+  });
+
   res.status(204).send();
 });
 
