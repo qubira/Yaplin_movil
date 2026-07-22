@@ -7,6 +7,7 @@ import { useTheme } from '../../constants/theme';
 import { TeamMember } from '../../mocks/stores';
 import { useTeam, useStores } from '../../store/StoresStore';
 import { useTopInset } from '../../hooks/useTopInset';
+import { ApiError } from '../../services/api';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
@@ -92,7 +93,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
   onClose: () => void;
   initial: TeamMember | null;
   storeOptions: { id: string; name: string }[];
-  onSubmit: (data: MemberFormData) => void;
+  onSubmit: (data: MemberFormData) => Promise<void>;
   title: string;
 }) {
   const { c } = useTheme();
@@ -103,6 +104,8 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<TeamMember['role']>('cajero');
   const [storeId, setStoreId] = useState<string>('all');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -111,14 +114,23 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
     setPassword('');
     setRole(initial?.role ?? 'cajero');
     setStoreId(initial?.storeId ?? 'all');
+    setError('');
   }, [visible, initial]);
 
   const canSubmit = name.trim() && (isEdit || password.length >= 6);
 
-  function handleSubmit() {
-    if (!canSubmit) return;
-    onSubmit({ name: name.trim(), email: email.trim(), role, storeId, ...(password ? { password } : {}) });
-    onClose();
+  async function handleSubmit() {
+    if (!canSubmit || saving) return;
+    setError('');
+    setSaving(true);
+    try {
+      await onSubmit({ name: name.trim(), email: email.trim(), role, storeId, ...(password ? { password } : {}) });
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo guardar. Intenta de nuevo.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -173,9 +185,13 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
               })}
             </View>
 
-            <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit}
-              style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: canSubmit ? c.ACCENT_PURPLE : c.BORDER }}>
-              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Guardar</Text>
+            {!!error && (
+              <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 16 }}>{error}</Text>
+            )}
+
+            <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit || saving}
+              style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: canSubmit ? c.ACCENT_PURPLE : c.BORDER, opacity: saving ? 0.7 : 1 }}>
+              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{saving ? 'Guardando...' : 'Guardar'}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={onClose}
               style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
@@ -379,7 +395,7 @@ export default function TeamScreen() {
         initial={editingMember}
         storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
         title="Editar miembro"
-        onSubmit={(data) => { if (editingMember) updateMember(editingMember.id, data); }}
+        onSubmit={(data) => editingMember ? updateMember(editingMember.id, data) : Promise.resolve()}
       />
     </View>
   );
