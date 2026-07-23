@@ -150,9 +150,18 @@ export function useNotificationCapture() {
 
   // Shared by the live listener below and the shade-reconciliation pass
   // further down — everything after "we have a parsed transaction with a
-  // store" is identical either way.
+  // store" is identical either way. Also the single place that dedupes by
+  // reference: some banks (e.g. Interbank) post the same Plin payment twice
+  // under different notification channels a moment apart, and both arrive
+  // through the live listener — not just through shade reconciliation — so
+  // the check has to live here, added to referencesRef synchronously
+  // (instead of waiting for the transactions-state effect below) to close
+  // the race between those two near-simultaneous events.
   const registerTransaction = useRef((transaction: ReturnType<typeof parseNotification>) => {
     if (!transaction) return;
+    if (referencesRef.current.has(transaction.reference)) return;
+    referencesRef.current.add(transaction.reference);
+
     const storeId = defaultStoreIdRef.current;
     if (!storeId) return;
     transaction.storeId = storeId;
@@ -207,7 +216,7 @@ export function useNotificationCapture() {
         const recent: RawNotification[] = getNativeListener().getRecentNotifications();
         recent.forEach((event) => {
           const transaction = parseNotification(event);
-          if (!transaction || referencesRef.current.has(transaction.reference)) return;
+          if (!transaction) return;
           if (__DEV__) console.log('[YapLin] backfilling from shade:', JSON.stringify(event));
           registerTransaction(transaction);
         });

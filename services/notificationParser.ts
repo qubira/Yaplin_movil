@@ -38,14 +38,16 @@ export const PACKAGE_TO_INFO: Record<string, PackageInfo> = {
 
 // Only treat a notification as a received payment if its text hints at money
 // coming IN — this filters out outgoing transfers, promos, balance summaries, etc.
-const INCOMING_HINTS = /recib|te\s+(envi[oó]|pag[oó]|transfiri[oó]|yape[oó])/i;
+// Interbank's Plin notifications use "te ha plineado" (present perfect) instead
+// of the simple-past verbs Yape uses, hence the separate plin(...) branch.
+const INCOMING_HINTS = /recib|te\s+(?:ha\s+)?(?:envi[oó]|pag[oó]|transfiri[oó]|yape[oó]|plin(?:e[oó]|eado))/i;
 
 const AMOUNT_RE = /S\s*\/\.?\s*([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)/i;
 
 // Yape masks partial surnames with a trailing "*" (e.g. "Melani Loy* te envió...") —
 // the optional \*? after the name tolerates that without swallowing it into the name.
 const NAME_BEFORE_VERB_RE =
-  /([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'’.]*(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'’.]*){0,3})\*?\s+te\s+(?:envió|pagó|transfirió|yapeó)/i;
+  /([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'’.]*(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'’.]*){0,3})\*?\s+te\s+(?:ha\s+)?(?:envió|pagó|transfirió|yapeó|plineó|plineado)/i;
 
 const NAME_AFTER_DE_RE =
   /\bde\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'’.]*(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'’.]*){0,3})/;
@@ -68,6 +70,17 @@ function initialsOf(name: string): string {
 function parseAmount(raw: string): number | null {
   const n = parseFloat(raw.replace(/,/g, ''));
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Some banks (e.g. Interbank) don't include a security code in the notification
+// text, and also post the same payment twice under different channels/titles
+// ("Interbank" and "Negocios") a few hundred ms apart. Bucketing by minute
+// instead of using the raw timestamp makes both copies produce the same
+// reference, so the existing reference-based dedup collapses them into one.
+function fallbackReference(methodTag: string, payerName: string, amount: number, timestamp: Date): string {
+  const minuteBucket = Math.floor(timestamp.getTime() / 60000);
+  const slug = payerName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return `${methodTag.toUpperCase()}-${slug}-${Math.round(amount * 100)}-${minuteBucket}`;
 }
 
 function extractPayerName(fullText: string, title?: string): string {
@@ -118,7 +131,7 @@ export function parseNotification(data: RawNotification): Transaction | null {
     amount,
     method: info.method,
     timestamp,
-    reference: securityCode ?? `${methodTag.toUpperCase()}-${timestamp.getTime()}`,
+    reference: securityCode ?? fallbackReference(methodTag, payerName, amount, timestamp),
     status: 'confirmed',
     read: false,
   };
