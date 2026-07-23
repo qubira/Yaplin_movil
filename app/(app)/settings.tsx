@@ -83,7 +83,6 @@ export default function SettingsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(24);
-  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const { integrations, setYape, setIzipay, setPlinBank } = useIntegrations();
   const { preferences, setVoiceEnabled, setPushEnabled, setCaptureActive } = usePreferences();
 
@@ -207,7 +206,6 @@ export default function SettingsScreen() {
           <SectionTitle title="Notificaciones" />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
             <ToggleRow icon="notifications-outline" label="Notificaciones push" value={preferences.pushEnabled} onValueChange={togglePush} />
-            <ToggleRow icon="chatbubble-ellipses-outline" label="WhatsApp" value={whatsappEnabled} onValueChange={setWhatsappEnabled} />
             <ToggleRow icon="volume-medium-outline" label="Alerta de voz" value={preferences.voiceEnabled} onValueChange={setVoiceEnabled} />
           </View>
 

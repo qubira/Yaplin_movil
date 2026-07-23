@@ -28,7 +28,7 @@ export default function OnboardingScreen() {
 
   const slides: Slide[] = [
     { id: '1', icon: 'notifications',       iconColor: c.ACCENT_RED,    title: 'Nunca te pierdas un yapeo',      description: 'Recibe alertas instantáneas cada vez que alguien te pague por Yape, Plin o Izipay. Sin delays, sin pérdidas.' },
-    { id: '2', icon: 'chatbubble-ellipses', iconColor: c.ACCENT_CYAN,   title: 'Recibe alertas donde quieras',   description: 'Notificaciones push, WhatsApp o incluso voz. Tú decides cómo y cuándo te avisamos.' },
+    { id: '2', icon: 'chatbubble-ellipses', iconColor: c.ACCENT_CYAN,   title: 'Recibe alertas donde quieras',   description: 'Notificaciones push o incluso voz. Tú decides cómo y cuándo te avisamos.' },
     { id: '3', icon: 'bar-chart',           iconColor: c.ACCENT_PURPLE, title: 'Reportes en tiempo real',        description: 'Visualiza tus ventas del día, semana o mes. Toma mejores decisiones con datos claros.' },
   ];
 
