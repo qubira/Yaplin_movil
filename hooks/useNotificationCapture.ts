@@ -201,12 +201,19 @@ export function useNotificationCapture() {
   }, []);
 
   // Safety net for when Android kills the listener anyway (some OEMs do
-  // this despite stopWithTask="false" + foreground promotion): on every
-  // foreground transition, re-read whatever Yape/Plin/Izipay notifications
-  // are still sitting in the shade and register any whose reference isn't
-  // already in our transaction list. Grouped/collapsed notifications in the
-  // shade still carry their own individual text when read this way, so this
-  // catches payments even if several arrived stacked under one summary.
+  // this despite stopWithTask="false" + foreground promotion): re-read
+  // whatever Yape/Plin/Izipay notifications are still sitting in the shade
+  // and register any whose reference isn't already in our transaction list.
+  // Grouped/collapsed notifications in the shade still carry their own
+  // individual text when read this way, so this catches payments even if
+  // several arrived stacked under one summary.
+  //
+  // Runs on mount, on every foreground transition, AND on a 20s interval —
+  // the interval matters because MIUI (and some other OEMs) can silently
+  // detach the live listener mid-session without ever backgrounding the
+  // app, so a screen left open for an hour can otherwise miss everything
+  // that arrived after the listener died. The interval bounds how stale
+  // that gap can get without requiring the user to close/reopen the app.
   useEffect(() => {
     if (Platform.OS !== 'android') return;
 
@@ -229,6 +236,10 @@ export function useNotificationCapture() {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') reconcileFromShade();
     });
-    return () => subscription.remove();
+    const interval = setInterval(reconcileFromShade, 20000);
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
   }, [registerTransaction]);
 }
