@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Gradients } from '../constants/colors';
 import { useTheme } from '../constants/theme';
+import { useTranslation } from '../store/LocaleStore';
 import ThemeToggle from '../components/ui/ThemeToggle';
 
 const { width } = Dimensions.get('window');
@@ -23,13 +24,14 @@ interface Slide {
 export default function OnboardingScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const t = useTranslation();
   const flatListRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   const slides: Slide[] = [
-    { id: '1', icon: 'notifications',       iconColor: c.ACCENT_RED,    title: 'Nunca te pierdas un yapeo',      description: 'Recibe alertas instantáneas cada vez que alguien te pague por Yape, Plin o Izipay. Sin delays, sin pérdidas.' },
-    { id: '2', icon: 'chatbubble-ellipses', iconColor: c.ACCENT_CYAN,   title: 'Recibe alertas donde quieras',   description: 'Notificaciones push o incluso voz. Tú decides cómo y cuándo te avisamos.' },
-    { id: '3', icon: 'bar-chart',           iconColor: c.ACCENT_PURPLE, title: 'Reportes en tiempo real',        description: 'Visualiza tus ventas del día, semana o mes. Toma mejores decisiones con datos claros.' },
+    { id: '1', icon: 'notifications',       iconColor: c.ACCENT_RED,    title: t.onboarding.slides.slide1.title, description: t.onboarding.slides.slide1.description },
+    { id: '2', icon: 'chatbubble-ellipses', iconColor: c.ACCENT_CYAN,   title: t.onboarding.slides.slide2.title, description: t.onboarding.slides.slide2.description },
+    { id: '3', icon: 'bar-chart',           iconColor: c.ACCENT_PURPLE, title: t.onboarding.slides.slide3.title, description: t.onboarding.slides.slide3.description },
   ];
 
   const handleNext = async () => {
@@ -71,7 +73,7 @@ export default function OnboardingScreen() {
       {!isLast && (
         <TouchableOpacity onPress={() => router.replace('/(auth)')}
           style={{ position: 'absolute', top: insets.top + 16, right: 24, zIndex: 10, padding: 8 }}>
-          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>Omitir</Text>
+          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>{t.onboarding.skip}</Text>
         </TouchableOpacity>
       )}
 
@@ -99,7 +101,7 @@ export default function OnboardingScreen() {
           <LinearGradient colors={Gradients.PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={{ height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>
-              {isLast ? 'Comenzar' : 'Siguiente'}
+              {isLast ? t.onboarding.start : t.onboarding.next}
             </Text>
           </LinearGradient>
         </TouchableOpacity>

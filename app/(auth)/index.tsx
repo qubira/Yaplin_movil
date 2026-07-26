@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Gradients } from '../../constants/colors';
 import { useTheme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthStore';
+import { useTranslation } from '../../store/LocaleStore';
 import { ApiError } from '../../services/api';
 import { getAppVersionInfo } from '../../services/appVersion';
 import Input from '../../components/ui/Input';
@@ -15,6 +16,7 @@ import ThemeToggle from '../../components/ui/ThemeToggle';
 export default function AuthScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const t = useTranslation();
   const { user, login, logoutReason, clearLogoutReason } = useAuth();
   const { version, channel } = getAppVersionInfo();
   const [email, setEmail]       = useState('');
@@ -26,7 +28,7 @@ export default function AuthScreen() {
 
   async function handleLogin() {
     if (!email.trim() || !password) {
-      setError('Ingresa tu email y contraseña');
+      setError(t.auth.login.missingFields);
       return;
     }
     setError('');
@@ -35,7 +37,7 @@ export default function AuthScreen() {
     try {
       await login(email.trim(), password);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'No se pudo conectar al servidor');
+      setError(e instanceof ApiError ? e.message : t.auth.login.connectionError);
     } finally {
       setLoading(false);
     }
@@ -63,23 +65,23 @@ export default function AuthScreen() {
                 resizeMode="contain"
               />
               <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
-                Notificaciones de pago en tiempo real
+                {t.auth.login.tagline}
               </Text>
             </View>
 
             {/* Title */}
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 26, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-              Bienvenido
+              {t.auth.login.welcomeTitle}
             </Text>
             <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular', marginBottom: 36 }}>
-              Ingresa a tu cuenta para continuar
+              {t.auth.login.subtitle}
             </Text>
 
             {/* Form */}
             <View style={{ gap: 4 }}>
-              <Input label="Email" placeholder="tu@negocio.com" value={email} onChangeText={setEmail} keyboardType="email-address" leftIcon="mail-outline" />
+              <Input label={t.auth.login.emailLabel} placeholder={t.auth.login.emailPlaceholder} value={email} onChangeText={setEmail} keyboardType="email-address" leftIcon="mail-outline" />
               <View style={{ height: 8 }} />
-              <Input label="Contraseña" placeholder="••••••••" value={password} onChangeText={setPassword} isPassword leftIcon="lock-closed-outline" />
+              <Input label={t.auth.login.passwordLabel} placeholder="••••••••" value={password} onChangeText={setPassword} isPassword leftIcon="lock-closed-outline" />
             </View>
 
             {!!logoutReason && !error && (
@@ -102,7 +104,7 @@ export default function AuthScreen() {
               >
                 {loading ? <ActivityIndicator color="#fff" /> : (
                   <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>
-                    Iniciar sesión
+                    {t.auth.login.submitButton}
                   </Text>
                 )}
               </LinearGradient>

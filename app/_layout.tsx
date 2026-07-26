@@ -10,6 +10,7 @@ import {
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider, useTheme } from '../constants/theme';
+import { LocaleProvider } from '../store/LocaleStore';
 import { AuthProvider } from '../store/AuthStore';
 import { PaymentsProvider } from '../store/PaymentsStore';
 import { StoresProvider } from '../store/StoresStore';
@@ -54,13 +55,15 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <AuthProvider>
-          <StoresProvider>
-            <PaymentsProvider>
-              <AppStack />
-            </PaymentsProvider>
-          </StoresProvider>
-        </AuthProvider>
+        <LocaleProvider>
+          <AuthProvider>
+            <StoresProvider>
+              <PaymentsProvider>
+                <AppStack />
+              </PaymentsProvider>
+            </StoresProvider>
+          </AuthProvider>
+        </LocaleProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

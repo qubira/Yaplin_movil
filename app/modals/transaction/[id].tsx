@@ -14,14 +14,12 @@ import { formatAmount, formatDate, formatTime, Transaction } from '../../../mock
 import { useTransactions } from '../../../store/PaymentsStore';
 import { useStores } from '../../../store/StoresStore';
 import { useAuth } from '../../../store/AuthStore';
+import { useTranslation } from '../../../store/LocaleStore';
 import Avatar from '../../../components/ui/Avatar';
 
 const SUPPORT_EMAIL = 'qubirasac@gmail.com';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
-
-const MES_ABR  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const MES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 const METHOD = {
   yape:   { label: 'Yape',   logo: require('../../../assets/images/brands/yape.png'),   color: PaymentColors.yape,   gradientColors: ['#2D1060','#1A0A3C'] as [string, string] },
@@ -87,6 +85,9 @@ export default function TransactionDetailScreen() {
   const { c, toggle } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  const MES_ABR = t.common.months.abbr;
+  const MES_FULL = t.common.months.full;
   const { transactions } = useTransactions();
   const { stores } = useStores();
   const { user } = useAuth();
@@ -148,11 +149,11 @@ export default function TransactionDetailScreen() {
         <StatusBar style={c.isDark ? 'light' : 'dark'} />
         <Ionicons name="receipt-outline" size={40} color={c.TEXT_SECONDARY} />
         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 12, textAlign: 'center' }}>
-          Esta transacción ya no está disponible.
+          {t.transaction.notFound}
         </Text>
         <TouchableOpacity onPress={() => router.back()}
           style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-          <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold' }}>Volver</Text>
+          <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold' }}>{t.common.actions.back}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -167,22 +168,22 @@ export default function TransactionDetailScreen() {
   function openModal() { setFilterKey('all'); setCollapsed(new Set()); setHistoryModal(true); }
 
   const handleShare = async () => {
-    await Share.share({ message: `Comprobante YapLin\n${transaction.payerName} pagó ${formatAmount(transaction.amount)} vía ${brand.label}\nRef: ${transaction.reference}\nFecha: ${formatDate(transaction.timestamp)} ${formatTime(transaction.timestamp)}` });
+    await Share.share({ message: t.transaction.shareMessage(transaction.payerName, formatAmount(transaction.amount), brand.label, transaction.reference, formatDate(transaction.timestamp), formatTime(transaction.timestamp)) });
   };
 
   const handleReportProblem = async () => {
     const storeName = stores.find(s => s.id === transaction.storeId)?.name ?? '—';
-    const subject = `Reporte de problema - Pago ${transaction.reference}`;
+    const subject = t.transaction.reportEmail.subject(transaction.reference);
     const body = [
-      `Negocio: ${user?.businessName ?? '—'} — Tienda: ${storeName}`,
-      `Método de pago: ${brand.label}`,
-      `Monto: ${formatAmount(transaction.amount)}`,
-      `Fecha y hora: ${formatDate(transaction.timestamp)} ${formatTime(transaction.timestamp)}`,
-      `Referencia: ${transaction.reference}`,
-      `Reportado por: ${user?.name ?? '—'} (${user?.email ?? '—'})`,
+      t.transaction.reportEmail.businessLine(user?.businessName ?? '—', storeName),
+      t.transaction.reportEmail.methodLine(brand.label),
+      t.transaction.reportEmail.amountLine(formatAmount(transaction.amount)),
+      t.transaction.reportEmail.dateLine(formatDate(transaction.timestamp), formatTime(transaction.timestamp)),
+      t.transaction.reportEmail.referenceLine(transaction.reference),
+      t.transaction.reportEmail.reportedByLine(user?.name ?? '—', user?.email ?? '—'),
       '',
-      'Descripción del problema:',
-      '(escribe aquí los detalles)',
+      t.transaction.reportEmail.descriptionLabel,
+      t.transaction.reportEmail.descriptionPlaceholder,
     ].join('\n');
     const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
@@ -223,13 +224,13 @@ export default function TransactionDetailScreen() {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${c.SUCCESS}22`, borderWidth: 1, borderColor: `${c.SUCCESS}55`, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, marginBottom: 24 }}>
             <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.SUCCESS }} />
-            <Text style={{ color: c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Confirmado</Text>
+            <Text style={{ color: c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.confirmed}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, alignSelf: 'stretch' }}>
             <Avatar initials={transaction.payerInitials} size="sm" color={brand.color} />
             <View style={{ marginLeft: 10 }}>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{transaction.payerName}</Text>
-              <Text style={{ color: brand.color, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 }}>vía {brand.label}</Text>
+              <Text style={{ color: brand.color, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{t.transaction.via(brand.label)}</Text>
             </View>
           </View>
         </LinearGradient>
@@ -237,18 +238,18 @@ export default function TransactionDetailScreen() {
         {/* Detail */}
         <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>
-            Detalle del pago
+            {t.transaction.detailTitle}
           </Text>
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16, overflow: 'hidden' }}>
-            <DetailRow label="Fecha"         value={formatDate(transaction.timestamp)} />
-            <DetailRow label="Hora"          value={formatTime(transaction.timestamp)} />
-            <DetailRow label="Referencia"    value={transaction.reference} valueColor={c.ACCENT_CYAN} />
-            <DetailRow label="Medio de pago" value={brand.label} valueColor={brand.color} />
+            <DetailRow label={t.transaction.detail.date}      value={formatDate(transaction.timestamp)} />
+            <DetailRow label={t.transaction.detail.time}      value={formatTime(transaction.timestamp)} />
+            <DetailRow label={t.transaction.detail.reference} value={transaction.reference} valueColor={c.ACCENT_CYAN} />
+            <DetailRow label={t.transaction.detail.method}    value={brand.label} valueColor={brand.color} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15 }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Estado</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.transaction.detail.status}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: `${c.SUCCESS}18`, borderWidth: 1, borderColor: `${c.SUCCESS}44`, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.SUCCESS }} />
-                <Text style={{ color: c.SUCCESS, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Confirmado</Text>
+                <Text style={{ color: c.SUCCESS, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.confirmed}</Text>
               </View>
             </View>
           </View>
@@ -257,13 +258,13 @@ export default function TransactionDetailScreen() {
         {/* Payer summary */}
         <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>
-            Resumen del cliente
+            {t.transaction.payerSummaryTitle}
           </Text>
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
             <Avatar initials={transaction.payerInitials} size="lg" color={brand.color} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: c.TEXT_PRIMARY, fontSize: 16, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>{transaction.payerName}</Text>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 3 }}>{allPayerTxns.length} pagos · {formatAmount(totalFromPayer)} total</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 3 }}>{t.transaction.payerSummary(allPayerTxns.length, formatAmount(totalFromPayer))}</Text>
             </View>
           </View>
         </View>
@@ -272,9 +273,9 @@ export default function TransactionDetailScreen() {
         {historyPreview.length > 0 && (
           <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>Historial de pagos</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>{t.transaction.historyTitle}</Text>
               <TouchableOpacity onPress={openModal}>
-                <Text style={{ color: c.ACCENT_CYAN, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Ver más</Text>
+                <Text style={{ color: c.ACCENT_CYAN, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>{t.transaction.viewMore}</Text>
               </TouchableOpacity>
             </View>
             <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16, overflow: 'hidden' }}>
@@ -290,12 +291,12 @@ export default function TransactionDetailScreen() {
           <TouchableOpacity onPress={handleShare} activeOpacity={0.85}
             style={{ height: 56, borderRadius: 18, backgroundColor: `${c.ACCENT_CYAN}18`, borderWidth: 1, borderColor: `${c.ACCENT_CYAN}44`, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }}>
             <Ionicons name="share-outline" size={20} color={c.ACCENT_CYAN} />
-            <Text style={{ color: c.ACCENT_CYAN, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Compartir comprobante</Text>
+            <Text style={{ color: c.ACCENT_CYAN, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.shareReceipt}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleReportProblem} activeOpacity={0.85}
             style={{ height: 56, borderRadius: 18, backgroundColor: `${c.ACCENT_RED}11`, borderWidth: 1, borderColor: `${c.ACCENT_RED}33`, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <Ionicons name="flag-outline" size={20} color={c.ACCENT_RED} />
-            <Text style={{ color: c.ACCENT_RED, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Reportar problema</Text>
+            <Text style={{ color: c.ACCENT_RED, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.reportProblem}</Text>
           </TouchableOpacity>
         </View>
 
@@ -312,7 +313,7 @@ export default function TransactionDetailScreen() {
               <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>Historial de pagos</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>{t.transaction.historyTitle}</Text>
               <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 1 }}>{transaction.payerName}</Text>
             </View>
             <Avatar initials={transaction.payerInitials} size="sm" color={brand.color} />
@@ -326,13 +327,13 @@ export default function TransactionDetailScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View>
                     <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 6 }}>
-                      {filterKey === 'all' ? 'Monto acumulado' : `${MES_FULL[parseInt(filterKey.split('-')[1])]} ${filterKey.split('-')[0]}`}
+                      {filterKey === 'all' ? t.transaction.accumulatedAmount : `${MES_FULL[parseInt(filterKey.split('-')[1])]} ${filterKey.split('-')[0]}`}
                     </Text>
                     <Text style={{ color: c.TEXT_PRIMARY, fontSize: 34, fontWeight: '800', fontFamily: 'Inter_800ExtraBold', letterSpacing: -1, marginBottom: 3 }}>
                       {formatAmount(filteredTotal)}
                     </Text>
                     <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
-                      {filteredCount} pago{filteredCount !== 1 ? 's' : ''}
+                      {t.transaction.paymentsCount(filteredCount)}
                     </Text>
                   </View>
                   <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: `${c.ACCENT_CYAN}18`, borderWidth: 1, borderColor: `${c.ACCENT_CYAN}33`, alignItems: 'center', justifyContent: 'center' }}>
@@ -360,7 +361,7 @@ export default function TransactionDetailScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingVertical: 16 }}>
               {(['all', ...monthGroups.map(g => g.key)] as string[]).map(key => {
                 const active = filterKey === key;
-                const label  = key === 'all' ? 'Todos' : `${MES_ABR[parseInt(key.split('-')[1])]} ${key.split('-')[0]}`;
+                const label  = key === 'all' ? t.transaction.filterAll : `${MES_ABR[parseInt(key.split('-')[1])]} ${key.split('-')[0]}`;
                 const count  = key === 'all' ? allPayerTxns.length : (monthGroups.find(g => g.key === key)?.txns.length ?? 0);
                 return (
                   <TouchableOpacity key={key} onPress={() => setFilterKey(key)}
@@ -397,7 +398,7 @@ export default function TransactionDetailScreen() {
                     <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
                       <Text style={{ color: c.SUCCESS, fontSize: 16, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>{formatAmount(group.subtotal)}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular' }}>{Math.round(pct)}% del total</Text>
+                        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular' }}>{t.transaction.percentOfTotal(Math.round(pct))}</Text>
                         <Ionicons name={isCollapsed ? 'chevron-down' : 'chevron-up'} size={14} color={c.TEXT_SECONDARY} />
                       </View>
                     </View>
@@ -419,7 +420,7 @@ export default function TransactionDetailScreen() {
             {visibleGroups.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 60, gap: 12 }}>
                 <Ionicons name="receipt-outline" size={44} color={c.TEXT_SECONDARY} />
-                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular' }}>Sin pagos en este período</Text>
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular' }}>{t.common.noPaymentsInPeriod}</Text>
               </View>
             )}
 
@@ -432,10 +433,10 @@ export default function TransactionDetailScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 32 }}>
           <View style={{ width: '100%', backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 24 }}>
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-              No encontramos una app de correo
+              {t.transaction.noMailApp.title}
             </Text>
             <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20, marginBottom: 16 }}>
-              Escribe directamente a soporte con los detalles de este pago:
+              {t.transaction.noMailApp.description}
             </Text>
             <View style={{ backgroundColor: c.BACKGROUND_CARD_2, borderRadius: 14, borderWidth: 1, borderColor: c.BORDER, padding: 14, marginBottom: 20 }}>
               <Text selectable style={{ color: c.ACCENT_CYAN, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textAlign: 'center' }}>
@@ -444,7 +445,7 @@ export default function TransactionDetailScreen() {
             </View>
             <TouchableOpacity onPress={() => setSupportModal(false)} activeOpacity={0.85}
               style={{ height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Cerrar</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.close}</Text>
             </TouchableOpacity>
           </View>
         </View>

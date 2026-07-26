@@ -7,6 +7,7 @@ import { PaymentColors } from '../../constants/colors';
 import { useTheme } from '../../constants/theme';
 import { formatAmount, formatTime, Transaction } from '../../mocks/transactions';
 import { useTransactions } from '../../store/PaymentsStore';
+import { useTranslation } from '../../store/LocaleStore';
 import EmptyState from '../../components/ui/EmptyState';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 import { useTopInset } from '../../hooks/useTopInset';
@@ -23,6 +24,7 @@ export default function NotificationsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(20);
+  const t = useTranslation();
   const { transactions: notifications, removeTransaction, markAllRead } = useTransactions();
 
   const deleteNotification = (id: string) => removeTransaction(id);
@@ -33,9 +35,9 @@ export default function NotificationsScreen() {
   const thisWeek  = notifications.filter(n => (now.getTime() - n.timestamp.getTime()) / 3600000 >= 48);
 
   const sections = [
-    ...(today.length     ? [{ title: 'Hoy',          data: today }]     : []),
-    ...(yesterday.length ? [{ title: 'Ayer',          data: yesterday }] : []),
-    ...(thisWeek.length  ? [{ title: 'Esta semana',   data: thisWeek }]  : []),
+    ...(today.length     ? [{ title: t.notifications.sections.today,     data: today }]     : []),
+    ...(yesterday.length ? [{ title: t.notifications.sections.yesterday, data: yesterday }] : []),
+    ...(thisWeek.length  ? [{ title: t.notifications.sections.thisWeek,  data: thisWeek }]  : []),
   ];
 
   const renderRightActions = (id: string, _p: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
@@ -66,7 +68,7 @@ export default function NotificationsScreen() {
             {item.payerName}
           </Text>
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, marginTop: 2, fontFamily: 'Inter_400Regular' }}>
-            Pago por {methodLabels[item.method]}
+            {t.notifications.paidVia(methodLabels[item.method])}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -89,18 +91,18 @@ export default function NotificationsScreen() {
       {/* Header */}
       <View style={{ paddingTop: topInset, paddingHorizontal: 24, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ color: c.TEXT_PRIMARY, fontSize: 24, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>
-          Notificaciones
+          {t.notifications.header.title}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
           <TouchableOpacity onPress={markAllRead}>
-            <Text style={{ color: c.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>Marcar leídas</Text>
+            <Text style={{ color: c.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.notifications.markAllRead}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {notifications.length === 0 ? (
-        <EmptyState icon="notifications-off-outline" title="Aún no tienes notificaciones" description="Las notificaciones de tus pagos aparecerán aquí en tiempo real." />
+        <EmptyState icon="notifications-off-outline" title={t.notifications.empty.title} description={t.notifications.empty.description} />
       ) : (
         <SectionList
           sections={sections}

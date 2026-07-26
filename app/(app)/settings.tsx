@@ -9,6 +9,8 @@ import { useTheme } from '../../constants/theme';
 import { useIntegrations, usePreferences, PlinBank } from '../../store/PaymentsStore';
 import { useDefaultStore } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
+import { useLocale, useTranslation } from '../../store/LocaleStore';
+import { LOCALES, LOCALE_META } from '../../translations/locales';
 import { isNotificationAccessGranted, openNotificationAccessSettings } from '../../services/androidNotificationAccess';
 import { isXiaomiDevice, openXiaomiAutostartSettings, requestIgnoreBatteryOptimizations } from '../../services/backgroundReliability';
 import { requestPushPermission } from '../../services/pushNotifications';
@@ -52,6 +54,7 @@ function IntegrationRow({ name, color, icon, connected, connectedLabel, onToggle
   name: string; color: string; icon: keyof typeof Ionicons.glyphMap; connected: boolean; connectedLabel?: string; onToggle: () => void;
 }) {
   const { c } = useTheme();
+  const t = useTranslation();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
       <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: `${color}22`, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
@@ -64,7 +67,7 @@ function IntegrationRow({ name, color, icon, connected, connectedLabel, onToggle
         borderWidth: 1, borderColor: connected ? `${c.SUCCESS}44` : `${color}44`,
       }}>
         <Text style={{ color: connected ? c.SUCCESS : color, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-          {connected ? (connectedLabel ?? 'Conectado') : 'Conectar'}
+          {connected ? (connectedLabel ?? t.common.actions.connected) : t.common.actions.connect}
         </Text>
       </TouchableOpacity>
     </View>
@@ -91,6 +94,47 @@ function ActionRow({ icon, label, buttonLabel, onPress }: {
   );
 }
 
+function LanguageRow({ code, onPress }: { code: typeof LOCALES[number]; onPress: () => void }) {
+  const { c } = useTheme();
+  const t = useTranslation();
+  const { locale } = useLocale();
+  const meta = LOCALE_META[code];
+  const selected = locale === code;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={meta.comingSoon}
+      activeOpacity={0.75}
+      style={{
+        flexDirection: 'row', alignItems: 'center', paddingVertical: 18,
+        borderBottomWidth: 1, borderBottomColor: c.BORDER,
+        opacity: meta.comingSoon ? 0.45 : 1,
+      }}
+    >
+      <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: `${c.ACCENT_PURPLE}22`, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+        <Ionicons name="language-outline" size={18} color={c.ACCENT_PURPLE} />
+      </View>
+      <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 15, fontFamily: 'Inter_400Regular' }}>{meta.nativeName}</Text>
+      {meta.comingSoon ? (
+        <View style={{
+          paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+          backgroundColor: `${c.TEXT_SECONDARY}22`, borderWidth: 1, borderColor: `${c.TEXT_SECONDARY}44`,
+        }}>
+          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+            {t.settings.languageComingSoon}
+          </Text>
+        </View>
+      ) : (
+        <Ionicons
+          name={selected ? 'radio-button-on' : 'radio-button-off'}
+          size={20}
+          color={selected ? c.ACCENT_PURPLE : c.TEXT_SECONDARY}
+        />
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function SectionTitle({ title }: { title: string }) {
   const { c } = useTheme();
   return (
@@ -104,6 +148,8 @@ export default function SettingsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(24);
+  const t = useTranslation();
+  const { locale, setLocale } = useLocale();
   const { integrations, setYape, setIzipay, setPlinBank } = useIntegrations();
   const { preferences, setVoiceEnabled, setPushEnabled, setCaptureActive } = usePreferences();
 
@@ -120,7 +166,7 @@ export default function SettingsScreen() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [plinModal, setPlinModal] = useState(false);
   const [storeModal, setStoreModal] = useState(false);
-  const defaultStoreName = stores.find(s => s.id === defaultStoreId)?.name ?? 'Sin asignar';
+  const defaultStoreName = stores.find(s => s.id === defaultStoreId)?.name ?? t.settings.myBusiness.unassigned;
 
   // When "Conectar" has to send the user to Android Settings first, we remember
   // what they were trying to turn on so it finishes automatically the moment
@@ -176,27 +222,27 @@ export default function SettingsScreen() {
         <View style={{ paddingHorizontal: 24 }}>
 
           {/* Mi negocio */}
-          <SectionTitle title="Mi negocio" />
+          <SectionTitle title={t.settings.section.myBusiness} />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Dueño</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.myBusiness.owner}</Text>
               <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{user?.name ?? '—'}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Plan</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.myBusiness.plan}</Text>
               <Badge label={user?.subscription?.planName ?? '—'} variant="info" size="md" />
             </View>
             {!!user?.subscription && (
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
-                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Vence</Text>
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.myBusiness.expires}</Text>
                 <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                  {new Date(user.subscription.currentPeriodEnd).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {new Date(user.subscription.currentPeriodEnd).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </Text>
               </View>
             )}
             <TouchableOpacity onPress={() => setStoreModal(true)}
               style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Tienda predeterminada</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.myBusiness.defaultStore}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{defaultStoreName}</Text>
                 <Ionicons name="chevron-forward" size={16} color={c.TEXT_SECONDARY} />
@@ -204,55 +250,55 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 8, paddingHorizontal: 4 }}>
-            Los pagos que este celular capture se suman a la tienda predeterminada.
+            {t.settings.myBusiness.defaultStoreHint}
           </Text>
 
           {/* Batería */}
-          <SectionTitle title="Batería" />
+          <SectionTitle title={t.settings.section.battery} />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
             <ToggleRow
               icon="battery-charging-outline"
-              label="Captura activa"
+              label={t.settings.battery.captureActiveLabel}
               value={preferences.captureActive}
               onValueChange={setCaptureActive}
             />
             {Platform.OS === 'android' && (
               <ActionRow
                 icon="shield-checkmark-outline"
-                label="Ignorar optimización de batería"
-                buttonLabel="Configurar"
+                label={t.settings.battery.ignoreOptimization}
+                buttonLabel={t.common.actions.configure}
                 onPress={requestIgnoreBatteryOptimizations}
               />
             )}
             {isXiaomiDevice() && (
               <ActionRow
                 icon="rocket-outline"
-                label="Inicio automático (Xiaomi)"
-                buttonLabel="Configurar"
+                label={t.settings.battery.xiaomiAutostart}
+                buttonLabel={t.common.actions.configure}
                 onPress={openXiaomiAutostartSettings}
               />
             )}
           </View>
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 8, paddingHorizontal: 4 }}>
             {preferences.captureActive
-              ? 'YapLin revisa pagos nuevos cada 5 segundos y escucha las notificaciones de Yape/Plin/Izipay. Activa "Ignorar optimización de batería" (y "Inicio automático" si tu celular es Xiaomi) para que Android no lo apague solo tras un rato.'
-              : 'Captura en pausa: no se sincroniza ni se leen notificaciones de pago. Actívalo antes de empezar a atender.'}
+              ? t.settings.battery.hintActive
+              : t.settings.battery.hintPaused}
           </Text>
 
           {/* Notificaciones */}
-          <SectionTitle title="Notificaciones" />
+          <SectionTitle title={t.settings.section.notifications} />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
-            <ToggleRow icon="notifications-outline" label="Notificaciones push" value={preferences.pushEnabled} onValueChange={togglePush} />
-            <ToggleRow icon="volume-medium-outline" label="Alerta de voz" value={preferences.voiceEnabled} onValueChange={setVoiceEnabled} />
+            <ToggleRow icon="notifications-outline" label={t.settings.notifications.push} value={preferences.pushEnabled} onValueChange={togglePush} />
+            <ToggleRow icon="volume-medium-outline" label={t.settings.notifications.voiceAlert} value={preferences.voiceEnabled} onValueChange={setVoiceEnabled} />
           </View>
 
           {/* Integraciones */}
-          <SectionTitle title="Integraciones" />
+          <SectionTitle title={t.settings.section.integrations} />
           {Platform.OS !== 'android' ? (
             <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Ionicons name="information-circle-outline" size={20} color={c.TEXT_SECONDARY} />
               <Text style={{ flex: 1, color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 }}>
-                La captura automática de pagos solo está disponible en Android.
+                {t.settings.integrations.androidOnly}
               </Text>
             </View>
           ) : (
@@ -261,42 +307,50 @@ export default function SettingsScreen() {
                 connected={integrations.yape} onToggle={() => requestOrToggle(integrations.yape, setYape)} />
               <IntegrationRow name="Plin" color={PaymentColors.plin} icon="wallet-outline"
                 connected={plinConnectedCount > 0}
-                connectedLabel={`${plinConnectedCount} banco${plinConnectedCount !== 1 ? 's' : ''}`}
+                connectedLabel={t.settings.integrations.bankCount(plinConnectedCount)}
                 onToggle={() => setPlinModal(true)} />
               <IntegrationRow name="Izipay" color={PaymentColors.izipay} icon="card-outline"
                 connected={integrations.izipay} onToggle={() => requestOrToggle(integrations.izipay, setIzipay)} />
               {!permissionGranted && (
                 <View style={{ paddingVertical: 14 }}>
                   <Text style={{ color: c.WARNING, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 }}>
-                    Al conectar se abrirán los Ajustes de Android para dar acceso a notificaciones a YapLin. Vuelve a la app después de activarlo.
+                    {t.settings.integrations.permissionWarning}
                   </Text>
                 </View>
               )}
             </View>
           )}
 
+          {/* Idioma */}
+          <SectionTitle title={t.settings.languageSection} />
+          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+            {LOCALES.map(code => (
+              <LanguageRow key={code} code={code} onPress={() => setLocale(code)} />
+            ))}
+          </View>
+
           {/* Cuenta */}
-          <SectionTitle title="Cuenta" />
+          <SectionTitle title={t.settings.section.account} />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, overflow: 'hidden' }}>
             <TouchableOpacity onPress={() => { logout(); router.replace('/(auth)'); }} style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}>
               <Ionicons name="log-out-outline" size={18} color={c.ACCENT_RED} style={{ marginRight: 12 }} />
-              <Text style={{ flex: 1, color: c.ACCENT_RED, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>Cerrar sesión</Text>
+              <Text style={{ flex: 1, color: c.ACCENT_RED, fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.settings.account.logout}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Acerca de */}
-          <SectionTitle title="Acerca de" />
+          <SectionTitle title={t.settings.section.about} />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Versión</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.about.version}</Text>
               <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.version}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Canal</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.about.channel}</Text>
               <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.channel}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Actualización</Text>
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.about.update}</Text>
               <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.updateLabel}</Text>
             </View>
           </View>
@@ -310,10 +364,10 @@ export default function SettingsScreen() {
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-              Plin por banco
+              {t.settings.plinModal.title}
             </Text>
             <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-              Plin no es una app propia: viene dentro de la app de tu banco. Activa los bancos desde los que recibes pagos por Plin.
+              {t.settings.plinModal.description}
             </Text>
             <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
               {PLIN_BANKS.map((bank, i) => (
@@ -329,7 +383,7 @@ export default function SettingsScreen() {
             </View>
             <TouchableOpacity onPress={() => setPlinModal(false)}
               style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Listo</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.plinModal.done}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -341,10 +395,10 @@ export default function SettingsScreen() {
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-              Tienda predeterminada
+              {t.settings.storeModal.title}
             </Text>
             <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-              Este celular solo puede tener una cuenta de Yape/Plin/Izipay conectada. Todo pago capturado se suma a la tienda que elijas aquí.
+              {t.settings.storeModal.description}
             </Text>
             <View style={{ gap: 8 }}>
               {stores.map(store => {
@@ -360,7 +414,7 @@ export default function SettingsScreen() {
             </View>
             <TouchableOpacity onPress={() => setStoreModal(false)}
               style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Cerrar</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.close}</Text>
             </TouchableOpacity>
           </View>
         </View>

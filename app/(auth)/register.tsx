@@ -5,10 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthStore';
+import { useTranslation } from '../../store/LocaleStore';
 
 export default function RegisterScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const t = useTranslation();
   const { user } = useAuth();
 
   if (user) return <Redirect href="/(app)/dashboard" />;
@@ -28,18 +30,16 @@ export default function RegisterScreen() {
         </TouchableOpacity>
 
         <Text style={{ color: c.TEXT_PRIMARY, fontSize: 26, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-          Registro deshabilitado
+          {t.auth.register.title}
         </Text>
         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular', marginBottom: 32 }}>
-          Las cuentas de negocio ahora se crean desde el panel de administración. Contacta a
-          soporte para dar de alta tu negocio. Una vez que tengas tu cuenta, tú mismo podrás
-          agregar tiendas y trabajadores desde aquí.
+          {t.auth.register.description}
         </Text>
 
         <TouchableOpacity onPress={() => router.replace('/(auth)')} activeOpacity={0.85}>
           <View style={{ height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 16, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>
-              Ir a iniciar sesión
+              {t.auth.register.goToLogin}
             </Text>
           </View>
         </TouchableOpacity>

@@ -12,15 +12,13 @@ import { useTheme, ThemeColors } from '../../constants/theme';
 import { PaymentColors } from '../../constants/colors';
 import { formatAmount, formatTime, formatDate, Transaction } from '../../mocks/transactions';
 import { useTransactions } from '../../store/PaymentsStore';
+import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
 import TransactionItem from '../../components/ui/TransactionItem';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 
 type Period = 'Hoy' | 'Día' | 'Semana' | 'Mes';
-
-const ABR  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 const { width: SW } = Dimensions.get('window');
 const MONTH_CELL_W = Math.floor((SW - 48 - 30) / 4);
@@ -69,11 +67,11 @@ function filtrar(txns: Transaction[], p: Period, sel: Sel, hoy: Date): Transacti
   return txns.filter(t => t.timestamp >= ini && t.timestamp < fin);
 }
 
-function labelPeriodo(p: Period, sel: Sel, hoy: Date) {
-  if (p === 'Hoy')    return `${hoy.getDate()} ${FULL[hoy.getMonth()]} ${hoy.getFullYear()}`;
-  if (p === 'Día')    return `${sel.diaD} ${FULL[sel.diaM]} ${sel.diaY}`;
-  if (p === 'Semana') return `Sem ${sel.semN}: ${sel.semS} ${ABR[sel.semM]} – ${sel.semE} ${ABR[sel.semM]} ${sel.semY}`;
-  return `${FULL[sel.mesM]} ${sel.mesY}`;
+function labelPeriodo(p: Period, sel: Sel, hoy: Date, abr: string[], full: string[], weekAbbr: string) {
+  if (p === 'Hoy')    return `${hoy.getDate()} ${full[hoy.getMonth()]} ${hoy.getFullYear()}`;
+  if (p === 'Día')    return `${sel.diaD} ${full[sel.diaM]} ${sel.diaY}`;
+  if (p === 'Semana') return `${weekAbbr} ${sel.semN}: ${sel.semS} ${abr[sel.semM]} – ${sel.semE} ${abr[sel.semM]} ${sel.semY}`;
+  return `${full[sel.mesM]} ${sel.mesY}`;
 }
 
 function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }) {
@@ -112,6 +110,15 @@ export default function DashboardScreen() {
   const { c: Colors, toggle } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(20);
+  const t = useTranslation();
+  const ABR = t.common.months.abbr;
+  const FULL = t.common.months.full;
+  const PERIOD_LABEL: Record<Period, string> = {
+    Hoy: t.dashboard.periods.today,
+    Día: t.dashboard.periods.day,
+    Semana: t.dashboard.periods.week,
+    Mes: t.dashboard.periods.month,
+  };
   const hoy = new Date();
 
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
@@ -157,7 +164,7 @@ export default function DashboardScreen() {
 
   const semanas   = weeksOf(navY, navM);
   const totalDias = daysInMonth(navY, navM);
-  const label     = labelPeriodo(periodo, sel, hoy);
+  const label     = labelPeriodo(periodo, sel, hoy, ABR, FULL, t.dashboard.weekAbbr);
 
   function goToDetail(txnId: string) {
     setVerTodos(false);
@@ -176,7 +183,7 @@ export default function DashboardScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Avatar initials="MN" size="md" color={Colors.ACCENT_PURPLE} />
           <View>
-            <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular' }}>Buenos días</Text>
+            <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular' }}>{t.dashboard.greeting}</Text>
             <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>Mi Negocio SAC</Text>
           </View>
         </View>
@@ -214,7 +221,7 @@ export default function DashboardScreen() {
             style={{ borderRadius: 28, padding: 28, borderWidth: 1, borderColor: `${Colors.ACCENT_PURPLE}33` }}
           >
             <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 13, marginBottom: 8, fontFamily: 'Inter_400Regular' }}>
-              Total recibido
+              {t.dashboard.totalReceived}
             </Text>
             <Text style={{
               color: Colors.TEXT_PRIMARY, fontSize: 40, fontWeight: '800',
@@ -225,7 +232,7 @@ export default function DashboardScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <Ionicons name="trending-up" size={14} color={Colors.SUCCESS} />
               <Text style={{ color: Colors.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                {txnsAll.length} transacciones
+                {t.dashboard.transactionsCount(txnsAll.length)}
               </Text>
             </View>
             <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 20 }}>
@@ -247,7 +254,7 @@ export default function DashboardScreen() {
                     color: periodo === p ? '#fff' : Colors.TEXT_SECONDARY,
                     fontWeight: '600', fontSize: 12, fontFamily: 'Inter_600SemiBold',
                   }}>
-                    {p}
+                    {PERIOD_LABEL[p]}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -259,11 +266,11 @@ export default function DashboardScreen() {
         <View style={{ paddingHorizontal: 24 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
             <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>
-              {periodo === 'Hoy' ? 'Últimos pagos' : 'Pagos del período'}
+              {periodo === 'Hoy' ? t.dashboard.recentPayments : t.dashboard.periodPayments}
             </Text>
             {txnsAll.length > 0 && (
               <TouchableOpacity onPress={() => setVerTodos(true)}>
-                <Text style={{ color: Colors.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>Ver todos</Text>
+                <Text style={{ color: Colors.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.dashboard.viewAll}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -274,7 +281,7 @@ export default function DashboardScreen() {
             <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
               <Ionicons name="receipt-outline" size={40} color={Colors.TEXT_SECONDARY} />
               <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular' }}>
-                Sin pagos en este período
+                {t.common.noPaymentsInPeriod}
               </Text>
             </View>
           ) : (
@@ -320,7 +327,7 @@ export default function DashboardScreen() {
               <Ionicons name="arrow-back" size={20} color={Colors.TEXT_PRIMARY} />
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>Todos los pagos</Text>
+              <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>{t.dashboard.allPayments}</Text>
               <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 1 }}>{label}</Text>
             </View>
           </View>
@@ -335,13 +342,13 @@ export default function DashboardScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                   <View>
                     <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 6 }}>
-                      Total del período
+                      {t.dashboard.periodTotal}
                     </Text>
                     <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 34, fontWeight: '800', fontFamily: 'Inter_800ExtraBold', letterSpacing: -1, marginBottom: 3 }}>
                       {formatAmount(total)}
                     </Text>
                     <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
-                      {txnsAll.length} pago{txnsAll.length !== 1 ? 's' : ''}
+                      {t.dashboard.paymentsCount(txnsAll.length)}
                     </Text>
                   </View>
                   <View style={{
@@ -372,10 +379,10 @@ export default function DashboardScreen() {
 
             <View style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
-                Transacciones
+                {t.dashboard.transactionsLabel}
               </Text>
               <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
-                {txnsAll.length} resultados
+                {t.dashboard.resultsCount(txnsAll.length)}
               </Text>
             </View>
 
@@ -410,7 +417,7 @@ export default function DashboardScreen() {
         }}>
           <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.BORDER, alignSelf: 'center', marginBottom: 20 }} />
           <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>
-            {periodo === 'Día' ? 'Seleccionar día' : periodo === 'Semana' ? 'Seleccionar semana' : 'Seleccionar mes'}
+            {periodo === 'Día' ? t.dashboard.picker.selectDay : periodo === 'Semana' ? t.dashboard.picker.selectWeek : t.dashboard.picker.selectMonth}
           </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -454,7 +461,7 @@ export default function DashboardScreen() {
                 onPress={() => { setSel(v => ({ ...v, diaY: navY, diaM: navM, diaD: tempDia })); setPickerVisible(false); }}
                 style={{ marginTop: 16, backgroundColor: Colors.ACCENT_PURPLE, borderRadius: 14, height: 50, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                  Ver {tempDia} {FULL[navM]} {navY}
+                  {t.dashboard.picker.viewDay(tempDia, FULL[navM], navY)}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -474,7 +481,7 @@ export default function DashboardScreen() {
                     }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: selW ? '#fff' : Colors.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                        Semana {w.n}
+                        {t.dashboard.picker.weekN(w.n)}
                       </Text>
                       <Text style={{ color: selW ? 'rgba(255,255,255,0.75)' : Colors.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 }}>
                         {w.s} {ABR[navM]} – {w.e} {ABR[navM]} {navY}

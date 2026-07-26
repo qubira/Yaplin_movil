@@ -6,46 +6,53 @@ import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../constants/theme';
 import { TeamMember } from '../../mocks/stores';
 import { useTeam, useStores } from '../../store/StoresStore';
+import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
 import { ApiError } from '../../services/api';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import { dictionaries } from '../../translations';
 
-const ROLE_CONFIG = {
-  owner:      { label: 'Dueño',      icon: 'shield-checkmark-outline' as const, desc: 'Acceso completo a todas las tiendas y configuraciones' },
-  supervisor: { label: 'Supervisor', icon: 'eye-outline' as const,              desc: 'Ver y gestionar pagos de su tienda asignada' },
-  cajero:     { label: 'Cajero',     icon: 'person-outline' as const,           desc: 'Solo recibe notificaciones de cobros de su tienda' },
-};
+function roleConfig(t: typeof dictionaries['es']) {
+  return {
+    owner:      { label: t.common.roles.owner,      icon: 'shield-checkmark-outline' as const, desc: t.team.roles.ownerDesc },
+    supervisor: { label: t.common.roles.supervisor, icon: 'eye-outline' as const,              desc: t.team.roles.supervisorDesc },
+    cajero:     { label: t.common.roles.cajero,     icon: 'person-outline' as const,           desc: t.team.roles.cajeroDesc },
+  };
+}
 
-const PERM_BY_ROLE: Record<TeamMember['role'], { label: string; allowed: boolean }[]> = {
-  owner: [
-    { label: 'Ver todas las tiendas', allowed: true },
-    { label: 'Agregar/editar miembros', allowed: true },
-    { label: 'Conciliación y reportes', allowed: true },
-    { label: 'Configuración de cuenta', allowed: true },
-    { label: 'Recibir notificaciones', allowed: true },
-  ],
-  supervisor: [
-    { label: 'Ver todas las tiendas', allowed: false },
-    { label: 'Agregar/editar miembros', allowed: false },
-    { label: 'Conciliación y reportes', allowed: true },
-    { label: 'Configuración de cuenta', allowed: false },
-    { label: 'Recibir notificaciones', allowed: true },
-  ],
-  cajero: [
-    { label: 'Ver todas las tiendas', allowed: false },
-    { label: 'Agregar/editar miembros', allowed: false },
-    { label: 'Conciliación y reportes', allowed: false },
-    { label: 'Configuración de cuenta', allowed: false },
-    { label: 'Recibir notificaciones', allowed: true },
-  ],
-};
+function permByRole(t: typeof dictionaries['es']): Record<TeamMember['role'], { label: string; allowed: boolean }[]> {
+  return {
+    owner: [
+      { label: t.team.permissions.viewAllStores, allowed: true },
+      { label: t.team.permissions.addEditMembers, allowed: true },
+      { label: t.team.permissions.reconciliationReports, allowed: true },
+      { label: t.team.permissions.accountSettings, allowed: true },
+      { label: t.team.permissions.receiveNotifications, allowed: true },
+    ],
+    supervisor: [
+      { label: t.team.permissions.viewAllStores, allowed: false },
+      { label: t.team.permissions.addEditMembers, allowed: false },
+      { label: t.team.permissions.reconciliationReports, allowed: true },
+      { label: t.team.permissions.accountSettings, allowed: false },
+      { label: t.team.permissions.receiveNotifications, allowed: true },
+    ],
+    cajero: [
+      { label: t.team.permissions.viewAllStores, allowed: false },
+      { label: t.team.permissions.addEditMembers, allowed: false },
+      { label: t.team.permissions.reconciliationReports, allowed: false },
+      { label: t.team.permissions.accountSettings, allowed: false },
+      { label: t.team.permissions.receiveNotifications, allowed: true },
+    ],
+  };
+}
 
 function MemberCard({ member, storeName, onPress }: { member: TeamMember; storeName: string; onPress: () => void }) {
   const { c } = useTheme();
-  const role = ROLE_CONFIG[member.role];
+  const t = useTranslation();
+  const role = roleConfig(t)[member.role];
   const roleColor = member.role === 'owner' ? c.ACCENT_PURPLE : member.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS;
 
   return (
@@ -60,7 +67,7 @@ function MemberCard({ member, storeName, onPress }: { member: TeamMember; storeN
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={[s.memberName, { color: c.TEXT_PRIMARY }]}>{member.name}</Text>
-          <Text style={[s.memberEmail, { color: c.TEXT_SECONDARY }]}>{member.email || 'Sin email'}</Text>
+          <Text style={[s.memberEmail, { color: c.TEXT_SECONDARY }]}>{member.email || t.common.fallback.noEmail}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
             <Ionicons name="business-outline" size={11} color={c.TEXT_SECONDARY} />
             <Text style={[s.storeText, { color: c.TEXT_SECONDARY }]}>{storeName}</Text>
@@ -72,7 +79,7 @@ function MemberCard({ member, storeName, onPress }: { member: TeamMember; storeN
             <Text style={[s.roleLabel, { color: roleColor }]}>{role.label}</Text>
           </View>
           {!member.active && (
-            <Text style={[s.inactiveLabel, { color: c.WARNING }]}>Inactivo</Text>
+            <Text style={[s.inactiveLabel, { color: c.WARNING }]}>{t.team.inactiveLabel}</Text>
           )}
         </View>
       </View>
@@ -98,6 +105,8 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  const ROLE_CONFIG = roleConfig(t);
   const isEdit = !!initial;
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -127,7 +136,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
       await onSubmit({ name: name.trim(), email: email.trim(), role, storeId, ...(password ? { password } : {}) });
       onClose();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'No se pudo guardar. Intenta de nuevo.');
+      setError(e instanceof ApiError ? e.message : t.team.form.saveError);
     } finally {
       setSaving(false);
     }
@@ -141,13 +150,13 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
             <View style={[s.sheetHandle, { backgroundColor: c.BORDER }]} />
             <Text style={[s.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
             <View style={{ gap: 4 }}>
-              <Input label="Nombre" placeholder="Ana Torres" value={name} onChangeText={setName} leftIcon="person-outline" />
+              <Input label={t.common.form.name} placeholder={t.team.form.namePlaceholder} value={name} onChangeText={setName} leftIcon="person-outline" />
               <View style={{ height: 8 }} />
-              <Input label="Email" placeholder="ana@negocio.com" value={email} onChangeText={setEmail} keyboardType="email-address" leftIcon="mail-outline" />
+              <Input label={t.team.form.emailLabel} placeholder={t.team.form.emailPlaceholder} value={email} onChangeText={setEmail} keyboardType="email-address" leftIcon="mail-outline" />
               <View style={{ height: 8 }} />
               <Input
-                label={isEdit ? 'Nueva contraseña (dejar en blanco para no cambiarla)' : 'Contraseña'}
-                placeholder="Mínimo 6 caracteres"
+                label={isEdit ? t.team.form.passwordLabelEdit : t.team.form.passwordLabelNew}
+                placeholder={t.team.form.passwordPlaceholder}
                 value={password}
                 onChangeText={setPassword}
                 isPassword
@@ -155,7 +164,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
               />
             </View>
 
-            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>Rol</Text>
+            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.form.roleSectionTitle}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {(['owner', 'supervisor', 'cajero'] as TeamMember['role'][]).map(r => {
                 const active = role === r;
@@ -172,9 +181,9 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
               })}
             </View>
 
-            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>Tienda asignada</Text>
+            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {[{ id: 'all', name: 'Todas las tiendas' }, ...storeOptions].map(opt => {
+              {[{ id: 'all', name: t.team.allStores }, ...storeOptions].map(opt => {
                 const active = storeId === opt.id;
                 return (
                   <TouchableOpacity key={opt.id} onPress={() => setStoreId(opt.id)} activeOpacity={0.8}
@@ -191,11 +200,11 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
 
             <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit || saving}
               style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: canSubmit ? c.ACCENT_PURPLE : c.BORDER, opacity: saving ? 0.7 : 1 }}>
-              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{saving ? 'Guardando...' : 'Guardar'}</Text>
+              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{saving ? t.common.actions.saving : t.common.actions.save}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={onClose}
               style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Cancelar</Text>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -208,6 +217,9 @@ export default function TeamScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(16);
+  const t = useTranslation();
+  const ROLE_CONFIG = roleConfig(t);
+  const PERM_BY_ROLE = permByRole(t);
   const { team, teamLoading, addMember, updateMember, removeMember } = useTeam();
   const { stores } = useStores();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -218,14 +230,14 @@ export default function TeamScreen() {
   const active = team.filter(m => m.active).length;
 
   function storeNameFor(storeId: string) {
-    if (storeId === 'all') return 'Todas las tiendas';
+    if (storeId === 'all') return t.team.allStores;
     return stores.find(st => st.id === storeId)?.name ?? '—';
   }
 
   function handleDelete(member: TeamMember) {
-    Alert.alert('Eliminar miembro', `¿Eliminar a "${member.name}" del equipo?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => { removeMember(member.id); setSelectedId(null); } },
+    Alert.alert(t.team.deleteAlert.title, t.team.deleteAlert.message(member.name), [
+      { text: t.common.actions.cancel, style: 'cancel' },
+      { text: t.common.actions.delete, style: 'destructive', onPress: () => { removeMember(member.id); setSelectedId(null); } },
     ]);
   }
 
@@ -236,8 +248,8 @@ export default function TeamScreen() {
       {/* Header */}
       <View style={[s.header, { paddingTop: topInset, borderBottomColor: c.BORDER }]}>
         <View>
-          <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY }]}>Mi equipo</Text>
-          <Text style={[s.headerSub, { color: c.TEXT_SECONDARY }]}>{active} activos · {team.length} total</Text>
+          <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY }]}>{t.team.header.title}</Text>
+          <Text style={[s.headerSub, { color: c.TEXT_SECONDARY }]}>{t.team.header.subtitle(active, team.length)}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
@@ -272,14 +284,14 @@ export default function TeamScreen() {
 
         {/* Access matrix */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-          <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginBottom: 10 }]}>Niveles de acceso</Text>
+          <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginBottom: 10 }]}>{t.team.accessLevelsTitle}</Text>
           <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
             {/* Header row */}
             <View style={[s.matrixRow, { borderBottomColor: c.BORDER }]}>
-              <Text style={[s.matrixHeader, { color: c.TEXT_SECONDARY, flex: 2 }]}>Permiso</Text>
-              <Text style={[s.matrixHeader, { color: c.ACCENT_PURPLE }]}>Dueño</Text>
-              <Text style={[s.matrixHeader, { color: c.ACCENT_CYAN }]}>Sup.</Text>
-              <Text style={[s.matrixHeader, { color: c.SUCCESS }]}>Cajero</Text>
+              <Text style={[s.matrixHeader, { color: c.TEXT_SECONDARY, flex: 2 }]}>{t.team.matrix.permission}</Text>
+              <Text style={[s.matrixHeader, { color: c.ACCENT_PURPLE }]}>{t.common.roles.owner}</Text>
+              <Text style={[s.matrixHeader, { color: c.ACCENT_CYAN }]}>{t.team.matrix.supervisorAbbr}</Text>
+              <Text style={[s.matrixHeader, { color: c.SUCCESS }]}>{t.common.roles.cajero}</Text>
             </View>
             {PERM_BY_ROLE.owner.map((perm, i) => (
               <View key={i} style={[s.matrixRow, i === PERM_BY_ROLE.owner.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: c.BORDER }]}>
@@ -294,7 +306,7 @@ export default function TeamScreen() {
 
         {/* Team list */}
         <View style={{ paddingHorizontal: 20 }}>
-          <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginBottom: 10 }]}>Miembros</Text>
+          <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginBottom: 10 }]}>{t.team.membersTitle}</Text>
           {teamLoading ? (
             <BrandLoader />
           ) : (
@@ -314,7 +326,7 @@ export default function TeamScreen() {
               <TouchableOpacity onPress={() => setSelectedId(null)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }]}>
                 <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
               </TouchableOpacity>
-              <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY, marginLeft: 14, flex: 1 }]}>Detalle del miembro</Text>
+              <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY, marginLeft: 14, flex: 1 }]}>{t.team.memberDetailTitle}</Text>
               <TouchableOpacity onPress={() => setEditingMember(selected)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
                 <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
               </TouchableOpacity>
@@ -327,7 +339,7 @@ export default function TeamScreen() {
               <View style={[s.profileCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
                 <Avatar initials={selected.initials} size="lg" color={selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS} />
                 <Text style={[s.profileName, { color: c.TEXT_PRIMARY }]}>{selected.name}</Text>
-                <Text style={[s.profileEmail, { color: c.TEXT_SECONDARY }]}>{selected.email || 'Sin email'}</Text>
+                <Text style={[s.profileEmail, { color: c.TEXT_SECONDARY }]}>{selected.email || t.common.fallback.noEmail}</Text>
                 <View style={[s.rolePill, {
                   backgroundColor: `${selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS}18`,
                   borderColor: `${selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS}40`,
@@ -341,7 +353,7 @@ export default function TeamScreen() {
 
               {/* Active toggle */}
               <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, marginTop: 16, padding: 16, flexDirection: 'row', alignItems: 'center' }]}>
-                <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Miembro activo</Text>
+                <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.team.activeMemberLabel}</Text>
                 <Switch
                   value={selected.active}
                   onValueChange={(v) => updateMember(selected.id, { active: v })}
@@ -351,7 +363,7 @@ export default function TeamScreen() {
               </View>
 
               {/* Permissions */}
-              <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>Permisos</Text>
+              <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.permissionsTitle}</Text>
               <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
                 {PERM_BY_ROLE[selected.role].map((perm, i) => (
                   <View key={i} style={[s.permRow, i === PERM_BY_ROLE[selected.role].length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: c.BORDER }]}>
@@ -362,7 +374,7 @@ export default function TeamScreen() {
               </View>
 
               {/* Store assignment */}
-              <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>Tienda asignada</Text>
+              <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
               <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, padding: 16 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={[s.roleStatIcon, { backgroundColor: `${c.ACCENT_PURPLE}18` }]}>
@@ -384,7 +396,7 @@ export default function TeamScreen() {
         onClose={() => setAddModal(false)}
         initial={null}
         storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
-        title="Agregar miembro"
+        title={t.team.addMemberTitle}
         onSubmit={(data) => addMember({ ...data, password: data.password ?? '', active: true })}
       />
 
@@ -394,7 +406,7 @@ export default function TeamScreen() {
         onClose={() => setEditingMember(null)}
         initial={editingMember}
         storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
-        title="Editar miembro"
+        title={t.team.editMemberTitle}
         onSubmit={(data) => editingMember ? updateMember(editingMember.id, data) : Promise.resolve()}
       />
     </View>
