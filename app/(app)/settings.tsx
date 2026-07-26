@@ -10,6 +10,7 @@ import { useIntegrations, usePreferences, PlinBank } from '../../store/PaymentsS
 import { useDefaultStore } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
 import { isNotificationAccessGranted, openNotificationAccessSettings } from '../../services/androidNotificationAccess';
+import { isXiaomiDevice, openXiaomiAutostartSettings, requestIgnoreBatteryOptimizations } from '../../services/backgroundReliability';
 import { requestPushPermission } from '../../services/pushNotifications';
 import { getAppVersionInfo } from '../../services/appVersion';
 import { useTopInset } from '../../hooks/useTopInset';
@@ -65,6 +66,26 @@ function IntegrationRow({ name, color, icon, connected, connectedLabel, onToggle
         <Text style={{ color: connected ? c.SUCCESS : color, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
           {connected ? (connectedLabel ?? 'Conectado') : 'Conectar'}
         </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function ActionRow({ icon, label, buttonLabel, onPress }: {
+  icon: keyof typeof Ionicons.glyphMap; label: string; buttonLabel: string; onPress: () => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
+      <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: `${c.ACCENT_PURPLE}22`, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+        <Ionicons name={icon} size={18} color={c.ACCENT_PURPLE} />
+      </View>
+      <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 15, fontFamily: 'Inter_400Regular' }}>{label}</Text>
+      <TouchableOpacity onPress={onPress} style={{
+        paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10,
+        backgroundColor: `${c.ACCENT_PURPLE}22`, borderWidth: 1, borderColor: `${c.ACCENT_PURPLE}44`,
+      }}>
+        <Text style={{ color: c.ACCENT_PURPLE, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{buttonLabel}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -195,10 +216,26 @@ export default function SettingsScreen() {
               value={preferences.captureActive}
               onValueChange={setCaptureActive}
             />
+            {Platform.OS === 'android' && (
+              <ActionRow
+                icon="shield-checkmark-outline"
+                label="Ignorar optimización de batería"
+                buttonLabel="Configurar"
+                onPress={requestIgnoreBatteryOptimizations}
+              />
+            )}
+            {isXiaomiDevice() && (
+              <ActionRow
+                icon="rocket-outline"
+                label="Inicio automático (Xiaomi)"
+                buttonLabel="Configurar"
+                onPress={openXiaomiAutostartSettings}
+              />
+            )}
           </View>
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 8, paddingHorizontal: 4 }}>
             {preferences.captureActive
-              ? 'YapLin revisa pagos nuevos cada 10 segundos y escucha las notificaciones de Yape/Plin/Izipay. Desactívalo cuando no estés atendiendo para ahorrar batería.'
+              ? 'YapLin revisa pagos nuevos cada 5 segundos y escucha las notificaciones de Yape/Plin/Izipay. Activa "Ignorar optimización de batería" (y "Inicio automático" si tu celular es Xiaomi) para que Android no lo apague solo tras un rato.'
               : 'Captura en pausa: no se sincroniza ni se leen notificaciones de pago. Actívalo antes de empezar a atender.'}
           </Text>
 

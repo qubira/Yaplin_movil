@@ -14,7 +14,15 @@ function withForegroundListener(config) {
     const manifest = config.modResults.manifest;
 
     manifest['uses-permission'] = manifest['uses-permission'] ?? [];
-    ['android.permission.FOREGROUND_SERVICE', 'android.permission.FOREGROUND_SERVICE_SPECIAL_USE'].forEach((name) => {
+    [
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
+      // Lets the app trigger the system's "ignore battery optimizations"
+      // request dialog for itself (services/batteryOptimization.ts) — a
+      // second, independent layer of defense against the OS killing the
+      // listener, on top of the foreground service + stopWithTask above.
+      'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+    ].forEach((name) => {
       const exists = manifest['uses-permission'].some((p) => p.$['android:name'] === name);
       if (!exists) manifest['uses-permission'].push({ $: { 'android:name': name } });
     });
