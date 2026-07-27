@@ -33,6 +33,11 @@ const es = {
   settings: {
     languageSection: 'Idioma',
     languageComingSoon: 'Próximamente',
+    languageModal: {
+      title: 'Elegir idioma',
+      description: 'Cambia el idioma de la app. Español e inglés están disponibles ahora; los demás aparecen reservados hasta tener su vocabulario listo.',
+      done: 'Listo',
+    },
     section: {
       myBusiness: 'Mi negocio',
       battery: 'Batería',

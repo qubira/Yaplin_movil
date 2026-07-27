@@ -166,6 +166,7 @@ export default function SettingsScreen() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [plinModal, setPlinModal] = useState(false);
   const [storeModal, setStoreModal] = useState(false);
+  const [languageModal, setLanguageModal] = useState(false);
   const defaultStoreName = stores.find(s => s.id === defaultStoreId)?.name ?? t.settings.myBusiness.unassigned;
 
   // When "Conectar" has to send the user to Android Settings first, we remember
@@ -324,9 +325,17 @@ export default function SettingsScreen() {
           {/* Idioma */}
           <SectionTitle title={t.settings.languageSection} />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
-            {LOCALES.map(code => (
-              <LanguageRow key={code} code={code} onPress={() => setLocale(code)} />
-            ))}
+            <TouchableOpacity onPress={() => setLanguageModal(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 18 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: `${c.ACCENT_PURPLE}22`, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                <Ionicons name="language-outline" size={18} color={c.ACCENT_PURPLE} />
+              </View>
+              <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 15, fontFamily: 'Inter_400Regular' }}>{t.settings.languageSection}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{LOCALE_META[locale].nativeName}</Text>
+                <Ionicons name="chevron-forward" size={16} color={c.TEXT_SECONDARY} />
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Cuenta */}
@@ -415,6 +424,35 @@ export default function SettingsScreen() {
             <TouchableOpacity onPress={() => setStoreModal(false)}
               style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
               <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.close}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Language picker */}
+      <Modal visible={languageModal} transparent animationType="slide" onRequestClose={() => setLanguageModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
+              {t.settings.languageModal.title}
+            </Text>
+            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+              {t.settings.languageModal.description}
+            </Text>
+            <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+              {LOCALES.map((code, i) => (
+                <View key={code} style={i === LOCALES.length - 1 ? undefined : { borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
+                  <LanguageRow
+                    code={code}
+                    onPress={() => { setLocale(code); setLanguageModal(false); }}
+                  />
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity onPress={() => setLanguageModal(false)}
+              style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.languageModal.done}</Text>
             </TouchableOpacity>
           </View>
         </View>

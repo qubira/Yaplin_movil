@@ -35,6 +35,11 @@ const en: typeof es = {
   settings: {
     languageSection: 'Language',
     languageComingSoon: 'Coming soon',
+    languageModal: {
+      title: 'Choose language',
+      description: 'Change the app language. Spanish and English are available now; the rest are reserved until their vocabulary is ready.',
+      done: 'Done',
+    },
     section: {
       myBusiness: 'My business',
       battery: 'Battery',
