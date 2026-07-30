@@ -6,6 +6,7 @@ import meRouter from './routes/me';
 import storesRouter from './routes/stores';
 import teamRouter from './routes/team';
 import transactionsRouter from './routes/transactions';
+import securityRouter from './routes/security';
 
 const app = express();
 app.use(cors());
@@ -17,6 +18,7 @@ app.use('/me', meRouter);
 app.use('/stores', storesRouter);
 app.use('/team', teamRouter);
 app.use('/transactions', transactionsRouter);
+app.use('/security', securityRouter);
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, () => console.log(`YapLin backend listening on :${port}`));

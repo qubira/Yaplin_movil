@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../db';
 import { signToken } from '../auth';
 import { checkBusinessAccess, getSubscriptionSummary, type SubscriptionSummary } from '../subscription';
-import { normalizeEmail } from '../audit';
+import { normalizeEmail, requestIp } from '../audit';
+import { logBlockedIntent, recordSuccessfulLogin } from '../security';
 
 const router = Router();
 
@@ -45,7 +46,21 @@ router.post('/login', async (req, res) => {
   if (!user) return res.status(401).json({ error: 'Credenciales inválidas' });
 
   const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) return res.status(401).json({ error: 'Credenciales inválidas' });
+  if (!valid) {
+    // We only know the business/user once the email matches, so an unknown
+    // email is never logged here (IntentAuditLog.businessId is required) —
+    // a wrong password for a real account is what feeds risk escalation.
+    await logBlockedIntent({
+      businessId: user.businessId,
+      userId: user.id,
+      actorEmail: user.email,
+      eventType: 'LOGIN_FAILED',
+      severity: 'low',
+      ipAddress: requestIp(req),
+      userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+    });
+    return res.status(401).json({ error: 'Credenciales inválidas' });
+  }
 
   const access = await checkBusinessAccess(user.businessId);
   if (!user.active || !access.allowed) {
@@ -53,6 +68,8 @@ router.post('/login', async (req, res) => {
       access.code === 'ACCOUNT_EXPIRED' ? 'Tu suscripción venció.' : 'Tu cuenta fue suspendida.';
     return res.status(403).json({ error: message, code: access.code ?? 'ACCOUNT_SUSPENDED' });
   }
+
+  await recordSuccessfulLogin(user.id);
 
   const subscription = await getSubscriptionSummary(user.businessId);
   const token = signToken({

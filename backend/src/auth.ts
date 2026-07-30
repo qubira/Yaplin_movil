@@ -14,6 +14,7 @@ export interface AuthPayload {
 
 export interface AuthContext extends AuthPayload {
   email: string;
+  name: string;
 }
 
 declare global {
@@ -52,7 +53,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return res.status(403).json({ error: message, code: access.code });
     }
 
-    req.auth = { ...payload, email: user.email };
+    req.auth = { ...payload, email: user.email, name: user.name };
     next();
   } catch (err) {
     console.error('requireAuth check failed:', err);

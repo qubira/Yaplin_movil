@@ -26,29 +26,78 @@ enum SubscriptionStatus {
   cancelled
 }
 
-model Business {
-  id        String   @id @default(cuid())
-  name      String
-  ruc       String?
-  createdAt DateTime @default(now())
+enum TransactionStatus {
+  confirmed
+  voided
+}
 
-  users        User[]
-  stores       Store[]
-  subscription Subscription?
+enum TransactionSource {
+  auto
+  manual
+}
+
+enum TransactionEventType {
+  CAPTURED // automatic notification landed in GENERAL (or directly in a store if the business has only one)
+  MANUAL_CREATED // owner entered it by hand
+  ASSIGNED // fromStoreId: string|null, toStoreId: string — covers GENERAL->Store and Store->Store
+  RETURNED_TO_GENERAL // toStoreId goes back to null
+  AMOUNT_CORRECTED // delta, reason, previousAmount, newAmount
+  VOIDED // reason
+  VOID_REVERSED // reason — reversing a void is a new event, VOIDED is never edited
+  NOTE_ADDED // note
+}
+
+enum RiskLevel {
+  normal
+  watch
+  suspicious
+  blocked
+}
+
+enum IntentSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum IntentEventType {
+  LOGIN_FAILED
+  BLOCKED_STORE_ACCESS
+  BLOCKED_ROLE_ACTION
+  WRONG_CONFIRMATION
+  RISK_ESCALATED
+  ACCOUNT_AUTO_BLOCKED
+}
+
+model Business {
+  id               String   @id @default(cuid())
+  name             String
+  ruc              String?
+  autoBlockEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  users           User[]
+  stores          Store[]
+  subscription    Subscription?
+  transactions    Transaction[]
+  intentAuditLogs IntentAuditLog[]
 }
 
 model User {
-  id           String   @id @default(cuid())
-  businessId   String
-  business     Business @relation(fields: [businessId], references: [id])
-  email        String   @unique
-  passwordHash String
-  name         String
-  initials     String
-  role         Role
-  storeId      String?
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id                 String    @id @default(cuid())
+  businessId         String
+  business           Business  @relation(fields: [businessId], references: [id])
+  email              String    @unique
+  passwordHash       String
+  name               String
+  initials           String
+  role               Role
+  storeId            String?
+  active             Boolean   @default(true)
+  riskLevel          RiskLevel @default(normal)
+  transactionPinHash String?
+  createdAt          DateTime  @default(now())
 }
 
 model Store {
@@ -66,18 +115,60 @@ model Store {
 }
 
 model Transaction {
-  id            String   @id @default(cuid())
-  storeId       String
-  store         Store    @relation(fields: [storeId], references: [id])
-  payerName     String
-  payerInitials String
-  amount        Decimal  @db.Decimal(10, 2)
-  method        String
-  timestamp     DateTime
-  reference     String
-  status        String   @default("confirmed")
-  read          Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  id             String            @id @default(cuid())
+  businessId     String
+  business       Business          @relation(fields: [businessId], references: [id])
+  storeId        String? // null = GENERAL (unassigned pool)
+  store          Store?            @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  payerName      String
+  payerInitials  String
+  originalAmount Decimal           @db.Decimal(10, 2) // never changes after creation
+  amount         Decimal           @db.Decimal(10, 2) // projection: originalAmount + sum of AMOUNT_CORRECTED deltas
+  method         String
+  timestamp      DateTime // capture time, never changes
+  reference      String
+  status         TransactionStatus @default(confirmed)
+  read           Boolean           @default(false) // inbox state, not a financial fact — never becomes an event
+  source         TransactionSource @default(auto)
+  version        Int               @default(0) // optimistic lock
+  createdAt      DateTime          @default(now())
+
+  events TransactionEvent[]
+
+  @@index([businessId, timestamp])
+  @@index([businessId, storeId, timestamp])
+  @@index([storeId, timestamp])
+}
+
+model TransactionEvent {
+  seq           BigInt               @id @default(autoincrement()) // strict ordering, practically free on Postgres
+  id            String               @unique @default(cuid())
+  transactionId String
+  transaction   Transaction          @relation(fields: [transactionId], references: [id])
+  type          TransactionEventType
+  payload       Json?
+  actorId       String? // null = system event (automatic capture); no @relation, User is hard-deletable
+  actorName     String // copied at the time of the event ("Sistema" if actorId is null)
+  actorRole     String // copied at the time of the event
+  createdAt     DateTime             @default(now())
+
+  @@index([transactionId, seq])
+}
+
+model IntentAuditLog {
+  id         String          @id @default(cuid())
+  createdAt  DateTime        @default(now())
+  businessId String
+  business   Business        @relation(fields: [businessId], references: [id])
+  userId     String? // no @relation — User is hard-deletable via DELETE /team/:id
+  actorEmail String // copied at the time — same reason as TransactionEvent
+  eventType  IntentEventType
+  severity   IntentSeverity
+  detail     Json?
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([businessId, userId, eventType, createdAt])
 }
 
 // Subscription/Plan/AdminUser/AuditLog tables are owned and created by the
