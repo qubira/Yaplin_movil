@@ -429,14 +429,21 @@ router.post('/manual', requireOwnerLogged('MANUAL_CREATE'), async (req, res) => 
 
   const amountDecimal = new Prisma.Decimal(amount);
   const ts = timestamp ? new Date(timestamp) : new Date();
+  const resolvedPayerName = typeof payerName === 'string' && payerName.length > 0 ? payerName : 'Ingreso manual';
+  // A blank payerInitials made the mobile Avatar component derive a color
+  // from an empty string (NaN arithmetic -> an invalid "undefinedXX" color
+  // string), which broke rendering wherever Avatar is used without an
+  // explicit color prop (e.g. the plain transaction list) — always give
+  // manual entries real initials, same derivation used elsewhere (team.ts).
+  const resolvedInitials = resolvedPayerName.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
 
   const created = await prisma.$transaction(async (tx) => {
     const txn = await tx.transaction.create({
       data: {
         businessId: auth.businessId,
         storeId,
-        payerName: typeof payerName === 'string' && payerName.length > 0 ? payerName : 'Ingreso manual',
-        payerInitials: '',
+        payerName: resolvedPayerName,
+        payerInitials: resolvedInitials,
         originalAmount: amountDecimal,
         amount: amountDecimal,
         method: typeof method === 'string' && method.length > 0 ? method : 'manual',

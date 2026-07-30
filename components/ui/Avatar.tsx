@@ -24,11 +24,21 @@ const avatarColors = [
 ];
 
 function getColorForInitials(initials: string): string {
+  // An empty/undefined `initials` (e.g. a manually-entered payment with no
+  // payer name) made charCodeAt(0) return NaN, which propagated all the way
+  // to an invalid "undefinedXX" color string below — guard against it here
+  // instead of trusting every caller to always pass non-empty initials.
+  if (!initials) return avatarColors[0];
   const code = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
   return avatarColors[code % avatarColors.length];
 }
 
-export default function Avatar({ initials = '?', imageUri, size = 'md', color }: AvatarProps) {
+export default function Avatar({ initials: rawInitials, imageUri, size = 'md', color }: AvatarProps) {
+  // `initials = '?'` as a default parameter only kicks in when the prop is
+  // `undefined` — a caller passing an explicit empty string (e.g. a
+  // manually-entered payment with no payerInitials) skipped that default
+  // entirely, leaving an empty avatar and feeding '' into color derivation.
+  const initials = rawInitials || '?';
   const dim = sizeDimensions[size];
   const fontSize = fontSizes[size];
   const bgColor = color ?? getColorForInitials(initials);
