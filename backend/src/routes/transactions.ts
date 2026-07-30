@@ -22,8 +22,10 @@ function toPublicEvent(e: { seq: bigint; [key: string]: unknown }) {
 
 // Decides whether `auth` may move a transaction from `fromStoreId` to
 // `toStoreId`, per the permission matrix in the plan. Owner: unrestricted.
-// Supervisor: their store must be the origin or the destination (or they
-// oversee all stores, storeId === null) and it must be today's payment.
+// Supervisor: may only send a payment to GENERAL or to their OWN store —
+// never to a different specific store — and only touch payments that are
+// currently in GENERAL or already at their own store (never reach into
+// another store's payments), and only for today's payment.
 // Cajero: only GENERAL -> their own store, and only today's payment.
 function canRoute(
   auth: AuthContext,
@@ -36,8 +38,9 @@ function canRoute(
   const sameDay = isTimestampInLimaToday(timestamp);
 
   if (auth.role === 'supervisor') {
-    const scopeOk = auth.storeId === null || auth.storeId === fromStoreId || auth.storeId === toStoreId;
-    if (!scopeOk) return { allowed: false, eventType: 'BLOCKED_STORE_ACCESS' };
+    const toOk = toStoreId === null || (auth.storeId !== null && toStoreId === auth.storeId);
+    const fromOk = auth.storeId === null || fromStoreId === null || fromStoreId === auth.storeId;
+    if (!toOk || !fromOk) return { allowed: false, eventType: 'BLOCKED_STORE_ACCESS' };
     if (!sameDay) return { allowed: false, eventType: 'BLOCKED_ROLE_ACTION' };
     return { allowed: true };
   }
@@ -81,6 +84,9 @@ async function verifyConfirmation(params: ConfirmationParams): Promise<Confirmat
         businessId: params.auth.businessId,
         userId: params.auth.userId,
         actorEmail: params.auth.email,
+        actorName: params.auth.name,
+        actorRole: params.auth.role,
+        actorStoreId: params.auth.storeId,
         eventType: 'WRONG_CONFIRMATION',
         severity: 'medium',
         detail: { method: 'pin' },
@@ -291,6 +297,9 @@ router.post('/:id/route', async (req, res) => {
       businessId: auth.businessId,
       userId: auth.userId,
       actorEmail: auth.email,
+      actorName: auth.name,
+      actorRole: auth.role,
+      actorStoreId: auth.storeId,
       eventType: permission.eventType,
       severity: 'medium',
       detail: { transactionId: txn.id, fromStoreId: txn.storeId, toStoreId },
@@ -481,66 +490,29 @@ router.post('/manual', requireOwnerLogged('MANUAL_CREATE'), async (req, res) => 
   res.status(201).json(toPublic(created));
 });
 
-// POST /transactions/:id/void — owner only, double-confirmed. Replaces the
-// old physical DELETE, which had no role check at all.
-router.post('/:id/void', requireOwnerLogged('VOID'), async (req, res) => {
+// POST /transactions/:id/void — DISABLED for every role, including the
+// owner: voiding a payment is no longer a permitted action at all (business
+// decision — payments are immutable once captured). The route stays in
+// place, rather than being deleted, purely so any client still pointed at
+// it gets a clear, logged rejection instead of a bare 404, matching the
+// "hide the button, but 403 + log if the API is hit directly" rule applied
+// everywhere else in this file.
+router.post('/:id/void', async (req, res) => {
   const auth = req.auth!;
-  const { reason, version, confirmPin, confirmText } = req.body ?? {};
-
-  if (typeof reason !== 'string' || reason.trim().length === 0) {
-    return res.status(400).json({ error: 'reason es requerido' });
-  }
-  if (typeof version !== 'number') {
-    return res.status(400).json({ error: 'version es requerida' });
-  }
-
-  const txn = await prisma.transaction.findFirst({ where: { id: req.params.id, businessId: auth.businessId } });
-  if (!txn) return res.status(404).json({ error: 'Pago no encontrado' });
-  if (txn.status === 'voided') return res.status(409).json({ error: 'El pago ya está anulado.', code: 'ALREADY_VOIDED' });
-  if (isArchived(txn.timestamp)) {
-    return res.status(409).json({ error: 'Este pago pertenece a un año archivado (solo lectura).', code: 'ARCHIVED' });
-  }
-
-  const confirmation = await verifyConfirmation({
-    auth,
-    confirmPin,
-    confirmText,
-    ip: requestIp(req),
+  await logBlockedIntent({
+    businessId: auth.businessId,
+    userId: auth.userId,
+    actorEmail: auth.email,
+    actorName: auth.name,
+    actorRole: auth.role,
+    actorStoreId: auth.storeId,
+    eventType: 'BLOCKED_ROLE_ACTION',
+    severity: 'high',
+    detail: { actionAttempted: 'VOID', path: req.originalUrl, method: req.method, body: req.body },
+    ipAddress: requestIp(req),
     userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
   });
-  if (!confirmation.ok) return res.status(confirmation.status).json(confirmation.body);
-
-  const result = await prisma.$transaction(async (tx) => {
-    const before = await tx.transaction.findFirst({ where: { id: txn.id, businessId: auth.businessId } });
-    if (!before) return { notFound: true } as const;
-    if (before.status === 'voided') return { alreadyVoided: true } as const;
-
-    const updateResult = await tx.transaction.updateMany({
-      where: { id: before.id, version },
-      data: { status: 'voided', version: { increment: 1 } },
-    });
-    if (updateResult.count === 0) return { conflict: true } as const;
-
-    await tx.transactionEvent.create({
-      data: {
-        transactionId: before.id,
-        type: 'VOIDED',
-        payload: { reason },
-        actorId: auth.userId,
-        actorName: auth.name,
-        actorRole: auth.role,
-      },
-    });
-
-    return { transaction: await tx.transaction.findUniqueOrThrow({ where: { id: before.id } }) } as const;
-  });
-
-  if ('notFound' in result) return res.status(404).json({ error: 'Pago no encontrado' });
-  if ('alreadyVoided' in result) return res.status(409).json({ error: 'El pago ya está anulado.', code: 'ALREADY_VOIDED' });
-  if ('conflict' in result) {
-    return res.status(409).json({ error: 'La versión del pago cambió, refresca e intenta de nuevo.', code: 'VERSION_CONFLICT' });
-  }
-  res.json(toPublic(result.transaction));
+  return res.status(403).json({ error: 'Anular pagos ya no está permitido para ningún rol.' });
 });
 
 // POST /transactions/:id/void-reverse — owner only. A new event, never edits
@@ -611,6 +583,9 @@ router.get('/:id/events', async (req, res) => {
         businessId: auth.businessId,
         userId: auth.userId,
         actorEmail: auth.email,
+        actorName: auth.name,
+        actorRole: auth.role,
+        actorStoreId: auth.storeId,
         eventType: 'BLOCKED_STORE_ACCESS',
         severity: 'low',
         detail: { transactionId: txn.id },

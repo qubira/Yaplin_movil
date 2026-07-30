@@ -52,21 +52,22 @@ function routeOptions(
     const mine = stores.find(s => s.id === userStoreId);
     return mine ? [{ id: mine.id, name: mine.name }] : [];
   }
-  // supervisor
+  // Supervisor: may only send a payment to GENERAL or to their OWN store —
+  // never to a different specific store — and may only touch a payment
+  // that is currently in GENERAL or already at their own store (matches
+  // canRoute() in backend/src/routes/transactions.ts exactly).
   if (userStoreId === null) {
-    // storeId === null means this supervisor oversees ALL stores (same
-    // convention as team.tsx's "all stores" assignment) — matches the
-    // backend's `auth.storeId === null` branch, which allows any move,
-    // same freedom as owner, still gated on sameDay above.
-    return [generalOption, ...stores.filter(s => s.id !== txn.storeId).map(s => ({ id: s.id, name: s.name }))];
+    // No store assigned: there is no "suya" to send to, so the only valid
+    // destination is GENERAL, and only for payments not already there.
+    return txn.storeId !== null ? [generalOption] : [];
   }
-  const mine = stores.find(s => s.id === userStoreId);
-  const mineOption = mine && mine.id !== txn.storeId ? [{ id: mine.id, name: mine.name }] : [];
-  if (txn.storeId === userStoreId) {
-    // from their own store: any destination is allowed
-    return [generalOption, ...stores.filter(s => s.id !== txn.storeId).map(s => ({ id: s.id, name: s.name }))];
+  if (txn.storeId !== null && txn.storeId !== userStoreId) return []; // another store's payment: out of reach
+  if (txn.storeId === null) {
+    const mine = stores.find(s => s.id === userStoreId);
+    return mine ? [{ id: mine.id, name: mine.name }] : [];
   }
-  return mineOption;
+  // txn.storeId === userStoreId: the only valid move is back to GENERAL
+  return [generalOption];
 }
 
 function apiErrorMessage(e: unknown, t: typeof dictionaries['es']): string {
@@ -154,31 +155,53 @@ function ModalTxnRow({ txn, noBorder }: { txn: Transaction; noBorder?: boolean }
   );
 }
 
+// The literal text the backend accepts as confirmation when the owner
+// hasn't configured a PIN — matches CONFIRM_TEXT in
+// backend/src/routes/transactions.ts exactly.
+const CONFIRM_WORD = 'CONFIRMAR';
+
 // Shared double-confirmation input: a PIN keypad if the owner configured
-// one, otherwise a plain "type CONFIRMAR" text field — mirrors
-// verifyConfirmation() in backend/src/routes/transactions.ts exactly, so the
-// UI asks for whichever the backend will actually check.
+// one, otherwise a single "Confirmar" toggle button (no typing required) —
+// mirrors verifyConfirmation() in backend/src/routes/transactions.ts
+// exactly, so the UI asks for whichever the backend will actually check.
 function ConfirmField({ hasPin, value, onChangeText }: { hasPin: boolean; value: string; onChangeText: (v: string) => void }) {
+  const { c } = useTheme();
   const t = useTranslation();
-  return hasPin ? (
-    <Input
-      label={t.transaction.confirmStep.pinTitle}
-      placeholder={t.transaction.confirmStep.pinPlaceholder}
-      value={value}
-      onChangeText={(v) => onChangeText(v.replace(/[^0-9]/g, '').slice(0, 8))}
-      keyboardType="number-pad"
-      secureTextEntry
-      leftIcon="keypad-outline"
-    />
-  ) : (
-    <Input
-      label={t.transaction.confirmStep.textDescription(t.transaction.confirmStep.textPlaceholder)}
-      placeholder={t.transaction.confirmStep.textPlaceholder}
-      value={value}
-      onChangeText={onChangeText}
-      autoCapitalize="characters"
-      leftIcon="checkmark-done-outline"
-    />
+  if (hasPin) {
+    return (
+      <Input
+        label={t.transaction.confirmStep.pinTitle}
+        placeholder={t.transaction.confirmStep.pinPlaceholder}
+        value={value}
+        onChangeText={(v) => onChangeText(v.replace(/[^0-9]/g, '').slice(0, 8))}
+        keyboardType="number-pad"
+        secureTextEntry
+        leftIcon="keypad-outline"
+      />
+    );
+  }
+  const confirmed = value === CONFIRM_WORD;
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>
+        {t.transaction.confirmStep.textTitle}
+      </Text>
+      <TouchableOpacity
+        onPress={() => onChangeText(confirmed ? '' : CONFIRM_WORD)}
+        activeOpacity={0.85}
+        style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+          height: 52, borderRadius: 14, borderWidth: 1,
+          backgroundColor: confirmed ? `${c.SUCCESS}18` : c.BACKGROUND_CARD_2,
+          borderColor: confirmed ? c.SUCCESS : c.BORDER,
+        }}
+      >
+        <Ionicons name={confirmed ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={confirmed ? c.SUCCESS : c.TEXT_SECONDARY} />
+        <Text style={{ color: confirmed ? c.SUCCESS : c.TEXT_PRIMARY, fontWeight: '600', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>
+          {t.transaction.confirmStep.submit}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -293,7 +316,7 @@ export default function TransactionDetailScreen() {
   const t = useTranslation();
   const MES_ABR = t.common.months.abbr;
   const MES_FULL = t.common.months.full;
-  const { transactions, fetchTransactionEvents, fetchTransactionById, routeTransaction, correctAmount, voidTransaction, reverseVoid, refreshTransactions } = useTransactions();
+  const { transactions, fetchTransactionEvents, fetchTransactionById, routeTransaction, correctAmount, refreshTransactions } = useTransactions();
   const { stores } = useStores();
   const { user } = useAuth();
 
@@ -343,15 +366,15 @@ export default function TransactionDetailScreen() {
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
-  // ── Owner/routing actions ──
-  const [actionModal, setActionModal] = useState<'move' | 'correct' | 'void' | 'reverseVoid' | null>(null);
+  // ── Owner/routing actions ── anular ya no existe para ningún rol; un pago
+  // capturado es inmutable en su estado activo/anulado (queda solo mover y
+  // corregir monto, ambas eventos, nunca una eliminación).
+  const [actionModal, setActionModal] = useState<'move' | 'correct' | null>(null);
   const [actionError, setActionError] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [moveTarget, setMoveTarget] = useState<{ id: string | null; name: string } | null>(null);
   const [newAmountText, setNewAmountText] = useState('');
   const [correctReason, setCorrectReason] = useState('');
-  const [voidReason, setVoidReason] = useState('');
-  const [reverseReason, setReverseReason] = useState('');
   const [confirmValue, setConfirmValue] = useState('');
 
   const history = useMemo(() =>
@@ -404,8 +427,6 @@ export default function TransactionDetailScreen() {
   const isEdited = !!transaction && transaction.amount !== transaction.originalAmount;
   const archived = transaction ? isArchivedClient(transaction.timestamp) : false;
   const canCorrect = isOwner && !!transaction && !archived && !isVoided;
-  const canVoid = isOwner && !!transaction && !archived && !isVoided;
-  const canReverseVoid = isOwner && !!transaction && !archived && !!isVoided;
 
   const moveOptions = useMemo(() => {
     if (!transaction || !user) return [];
@@ -425,12 +446,10 @@ export default function TransactionDetailScreen() {
     }
   }
 
-  function openActionModal(kind: 'move' | 'correct' | 'void' | 'reverseVoid') {
+  function openActionModal(kind: 'move' | 'correct') {
     setActionError('');
     setConfirmValue('');
     if (kind === 'correct' && transaction) { setNewAmountText(String(transaction.amount)); setCorrectReason(''); }
-    if (kind === 'void') setVoidReason('');
-    if (kind === 'reverseVoid') setReverseReason('');
     if (kind === 'move') setMoveTarget(null);
     setActionModal(kind);
   }
@@ -473,42 +492,6 @@ export default function TransactionDetailScreen() {
     } catch (e) {
       if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
       if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
-      setActionError(apiErrorMessage(e, t));
-    } finally {
-      setActionSubmitting(false);
-    }
-  }
-
-  async function submitVoid() {
-    if (!transaction) return;
-    if (!voidReason.trim()) { setActionError(t.transaction.voidModal.reasonRequired); return; }
-    const confirm: ConfirmationInput = user?.hasTransactionPin ? { confirmPin: confirmValue } : { confirmText: confirmValue };
-    setActionSubmitting(true);
-    setActionError('');
-    try {
-      await voidTransaction(transaction.id, voidReason.trim(), transaction.version, confirm);
-      setActionModal(null);
-      loadEvents();
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
-      if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
-      setActionError(apiErrorMessage(e, t));
-    } finally {
-      setActionSubmitting(false);
-    }
-  }
-
-  async function submitReverseVoid() {
-    if (!transaction) return;
-    if (!reverseReason.trim()) { setActionError(t.transaction.reverseVoidModal.reasonRequired); return; }
-    setActionSubmitting(true);
-    setActionError('');
-    try {
-      await reverseVoid(transaction.id, reverseReason.trim(), transaction.version);
-      setActionModal(null);
-      loadEvents();
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
       setActionError(apiErrorMessage(e, t));
     } finally {
       setActionSubmitting(false);
@@ -660,8 +643,10 @@ export default function TransactionDetailScreen() {
           </View>
         </View>
 
-        {/* Acciones — mover / corregir / anular (gated client-side, backend re-checks everything) */}
-        {(canMove || canCorrect || canVoid || canReverseVoid) && (
+        {/* Acciones — mover / corregir (gated client-side, backend re-checks
+            everything). Anular ya no existe como acción para ningún rol —
+            un pago capturado es inmutable en su estado activo/anulado. */}
+        {(canMove || canCorrect) && (
           <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               {canMove && (
@@ -676,20 +661,6 @@ export default function TransactionDetailScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.ACCENT_PURPLE}18`, borderWidth: 1, borderColor: `${c.ACCENT_PURPLE}44` }}>
                   <Ionicons name="pencil-outline" size={16} color={c.ACCENT_PURPLE} />
                   <Text style={{ color: c.ACCENT_PURPLE, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.correctAmount}</Text>
-                </TouchableOpacity>
-              )}
-              {canVoid && (
-                <TouchableOpacity onPress={() => openActionModal('void')} activeOpacity={0.85}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.ACCENT_RED}18`, borderWidth: 1, borderColor: `${c.ACCENT_RED}44` }}>
-                  <Ionicons name="ban-outline" size={16} color={c.ACCENT_RED} />
-                  <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.void}</Text>
-                </TouchableOpacity>
-              )}
-              {canReverseVoid && (
-                <TouchableOpacity onPress={() => openActionModal('reverseVoid')} activeOpacity={0.85}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.SUCCESS}18`, borderWidth: 1, borderColor: `${c.SUCCESS}44` }}>
-                  <Ionicons name="refresh-outline" size={16} color={c.SUCCESS} />
-                  <Text style={{ color: c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.reverseVoid}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -975,45 +946,6 @@ export default function TransactionDetailScreen() {
         <ConfirmField hasPin={!!user?.hasTransactionPin} value={confirmValue} onChangeText={setConfirmValue} />
       </ActionModalShell>
 
-      {/* ══ ANULAR PAGO ══ */}
-      <ActionModalShell
-        visible={actionModal === 'void'}
-        title={t.transaction.voidModal.title}
-        onClose={() => setActionModal(null)}
-        onSubmit={submitVoid}
-        submitLabel={t.transaction.voidModal.submit}
-        submitting={actionSubmitting}
-        error={actionError}
-        submitColor={c.ACCENT_RED}
-      >
-        <Input
-          label={t.transaction.voidModal.reasonLabel}
-          placeholder={t.transaction.voidModal.reasonPlaceholder}
-          value={voidReason}
-          onChangeText={setVoidReason}
-          leftIcon="document-text-outline"
-        />
-        <ConfirmField hasPin={!!user?.hasTransactionPin} value={confirmValue} onChangeText={setConfirmValue} />
-      </ActionModalShell>
-
-      {/* ══ REVERTIR ANULACIÓN ══ */}
-      <ActionModalShell
-        visible={actionModal === 'reverseVoid'}
-        title={t.transaction.reverseVoidModal.title}
-        onClose={() => setActionModal(null)}
-        onSubmit={submitReverseVoid}
-        submitLabel={t.transaction.reverseVoidModal.submit}
-        submitting={actionSubmitting}
-        error={actionError}
-      >
-        <Input
-          label={t.transaction.reverseVoidModal.reasonLabel}
-          placeholder={t.transaction.reverseVoidModal.reasonPlaceholder}
-          value={reverseReason}
-          onChangeText={setReverseReason}
-          leftIcon="document-text-outline"
-        />
-      </ActionModalShell>
     </View>
   );
 }

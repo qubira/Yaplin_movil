@@ -54,6 +54,9 @@ export interface LogBlockedIntentEntry {
   businessId: string;
   userId: string | null;
   actorEmail: string;
+  actorName?: string | null;
+  actorRole?: string | null;
+  actorStoreId?: string | null;
   eventType: IntentEventType;
   severity: IntentSeverity;
   detail?: Prisma.InputJsonValue;
@@ -74,6 +77,9 @@ export async function logBlockedIntent(entry: LogBlockedIntentEntry): Promise<vo
         businessId: entry.businessId,
         userId: entry.userId,
         actorEmail: entry.actorEmail,
+        actorName: entry.actorName ?? null,
+        actorRole: entry.actorRole ?? null,
+        actorStoreId: entry.actorStoreId ?? null,
         eventType: entry.eventType,
         severity: entry.severity,
         detail: entry.detail,
@@ -113,6 +119,9 @@ export async function logBlockedIntent(entry: LogBlockedIntentEntry): Promise<vo
         businessId: entry.businessId,
         userId: entry.userId,
         actorEmail: entry.actorEmail,
+        actorName: user.name,
+        actorRole: user.role,
+        actorStoreId: user.storeId,
         eventType: 'RISK_ESCALATED',
         severity: computed === 'blocked' ? 'critical' : computed === 'suspicious' ? 'high' : 'medium',
         detail: { from: user.riskLevel, to: computed, windowCount },
@@ -125,6 +134,9 @@ export async function logBlockedIntent(entry: LogBlockedIntentEntry): Promise<vo
           businessId: entry.businessId,
           userId: entry.userId,
           actorEmail: entry.actorEmail,
+          actorName: user.name,
+          actorRole: user.role,
+          actorStoreId: user.storeId,
           eventType: 'ACCOUNT_AUTO_BLOCKED',
           severity: 'critical',
           detail: { windowCount },
@@ -183,6 +195,9 @@ export function requireOwnerLogged(actionAttempted: string) {
       businessId: auth.businessId,
       userId: auth.userId,
       actorEmail: auth.email,
+      actorName: auth.name,
+      actorRole: auth.role,
+      actorStoreId: auth.storeId,
       eventType: 'BLOCKED_ROLE_ACTION',
       severity: 'high',
       detail: { actionAttempted, path: req.originalUrl, method: req.method, body: req.body },

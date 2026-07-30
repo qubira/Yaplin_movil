@@ -214,7 +214,12 @@ export default function GeneralScreen() {
               txn={txn}
               assigning={assigningId === txn.id}
               canAssignMine={(user?.role === 'cajero' || user?.role === 'supervisor') && !!user.storeId}
-              canPick={user?.role === 'owner' || user?.role === 'supervisor'}
+              // Only the owner may send a GENERAL payment to a DIFFERENT
+              // specific store — a supervisor may only send it to GENERAL
+              // (nowhere to do that from here, it's already there) or to
+              // their own store (the swipe/button above already covers
+              // that), never to another store.
+              canPick={user?.role === 'owner'}
               onAssignMine={() => { if (user?.storeId) assign(txn, user.storeId); }}
               onAssignTo={() => setPickerTxn(txn)}
             />

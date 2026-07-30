@@ -280,21 +280,22 @@ export default function TeamScreen() {
     <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
-      {/* Header */}
-      <View style={[s.header, { paddingTop: topInset, borderBottomColor: c.BORDER }]}>
-        <View>
-          <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY }]}>{t.team.header.title}</Text>
-          <Text style={[s.headerSub, { color: c.TEXT_SECONDARY }]}>{t.team.header.subtitle(active, team.length)}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {/* Header — theme toggle at the far left (opposite end from the add
+          button), not bunched together with it */}
+      <View style={[s.header, { paddingTop: topInset, borderBottomColor: c.BORDER, justifyContent: 'space-between' }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <ThemeToggle />
-          {(user?.role === 'owner' || user?.role === 'supervisor') && (
-            <TouchableOpacity onPress={() => setAddModal(true)}
-              style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
-              <Ionicons name="person-add-outline" size={18} color="#fff" />
-            </TouchableOpacity>
-          )}
+          <View>
+            <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY }]}>{t.team.header.title}</Text>
+            <Text style={[s.headerSub, { color: c.TEXT_SECONDARY }]}>{t.team.header.subtitle(active, team.length)}</Text>
+          </View>
         </View>
+        {(user?.role === 'owner' || user?.role === 'supervisor') && (
+          <TouchableOpacity onPress={() => setAddModal(true)}
+            style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
+            <Ionicons name="person-add-outline" size={18} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 20 }}>

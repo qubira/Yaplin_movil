@@ -160,13 +160,16 @@ model IntentAuditLog {
   createdAt  DateTime        @default(now())
   businessId String
   business   Business        @relation(fields: [businessId], references: [id])
-  userId     String? // no @relation — User is hard-deletable via DELETE /team/:id
-  actorEmail String // copied at the time — same reason as TransactionEvent
-  eventType  IntentEventType
-  severity   IntentSeverity
-  detail     Json?
-  ipAddress  String?
-  userAgent  String?
+  userId       String? // no @relation — User is hard-deletable via DELETE /team/:id
+  actorEmail   String // copied at the time — same reason as TransactionEvent
+  actorName    String? // copied at the time; null for unauthenticated intents (e.g. login against an unknown email)
+  actorRole    String? // copied at the time
+  actorStoreId String? // copied at the time — no @relation, Store is deletable too
+  eventType    IntentEventType
+  severity     IntentSeverity
+  detail       Json?
+  ipAddress    String?
+  userAgent    String?
 
   @@index([businessId, userId, eventType, createdAt])
 }

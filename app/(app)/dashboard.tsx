@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Modal, Pressable, StyleSheet, Dimensions, Image,
+  Modal, Pressable, StyleSheet, Dimensions, Image, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,12 +12,24 @@ import { useTheme, ThemeColors } from '../../constants/theme';
 import { PaymentColors } from '../../constants/colors';
 import { formatAmount, formatTime, formatDate, Transaction } from '../../mocks/transactions';
 import { useTransactions } from '../../store/PaymentsStore';
+import { useStores } from '../../store/StoresStore';
+import { useAuth } from '../../store/AuthStore';
 import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
+import { ApiError } from '../../services/api';
 import TransactionItem from '../../components/ui/TransactionItem';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import BrandLoader from '../../components/ui/BrandLoader';
+
+// Local, device-time approximation of "today" — same convention already
+// used by routeOptions() in app/modals/transaction/[id].tsx: the client only
+// decides whether to SHOW the swipe gesture, the backend's Lima-timezone
+// canRoute() is the real authority and re-checks everything.
+function isTodayLocal(date: Date): boolean {
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+}
 
 type Period = 'Hoy' | 'Día' | 'Semana' | 'Mes';
 
@@ -30,6 +42,11 @@ const METHOD_LOGOS: Record<'yape' | 'plin' | 'izipay', any> = {
   izipay: require('../../assets/images/brands/izipay.png'),
 };
 const METHOD_LABELS: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay', manual: 'Manual' };
+
+function businessInitials(name: string | undefined): string {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '?';
+}
 
 function daysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
 
@@ -75,7 +92,7 @@ function labelPeriodo(p: Period, sel: Sel, hoy: Date, abr: string[], full: strin
   return `${full[sel.mesM]} ${sel.mesY}`;
 }
 
-function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }) {
+function VerTodosRow({ txn, onPress, storeName }: { txn: Transaction; onPress: () => void; storeName?: string | null }) {
   const { c } = useTheme();
   const t = useTranslation();
   const color = PaymentColors[txn.method];
@@ -101,6 +118,12 @@ function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12 }}>·</Text>
           <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular' }}>{txn.reference}</Text>
         </View>
+        {!!storeName && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+            <Ionicons name="business-outline" size={10} color={c.TEXT_SECONDARY} />
+            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 10, fontFamily: 'Inter_400Regular' }} numberOfLines={1}>{storeName}</Text>
+          </View>
+        )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <Text style={{
@@ -139,7 +162,23 @@ export default function DashboardScreen() {
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
   const [pickerVisible, setPickerVisible] = useState(false);
   const [verTodos, setVerTodos]       = useState(false);
-  const { transactions: allTxns, transactionsLoading } = useTransactions();
+  const { transactions: allTxns, transactionsLoading, routeTransaction, refreshTransactions } = useTransactions();
+  const { stores } = useStores();
+  const { user } = useAuth();
+
+  function storeNameFor(storeId: string | null): string | null {
+    if (storeId === null) return null;
+    return stores.find(s => s.id === storeId)?.name ?? null;
+  }
+
+  async function handleReturnToGeneral(txn: Transaction) {
+    try {
+      await routeTransaction(txn.id, null, txn.version);
+      await refreshTransactions();
+    } catch (e) {
+      Alert.alert('', e instanceof ApiError ? e.message : t.general.loadError);
+    }
+  }
 
   const [navY, setNavY]     = useState(hoy.getFullYear());
   const [navM, setNavM]     = useState(hoy.getMonth());
@@ -196,10 +235,10 @@ export default function DashboardScreen() {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Avatar initials="MN" size="md" color={Colors.ACCENT_PURPLE} />
+          <Avatar initials={businessInitials(user?.businessName)} size="md" color={Colors.ACCENT_PURPLE} />
           <View>
             <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular' }}>{t.dashboard.greeting}</Text>
-            <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>Mi Negocio SAC</Text>
+            <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>{user?.businessName ?? ''}</Text>
           </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -224,6 +263,17 @@ export default function DashboardScreen() {
               backgroundColor: Colors.ACCENT_RED, borderWidth: 1.5, borderColor: Colors.BACKGROUND_DARK,
             }} />
           </TouchableOpacity>
+          {/* Alert Center — hidden for cajero, who has no access to it at all */}
+          {user?.role !== 'cajero' && (
+            <TouchableOpacity
+              onPress={() => router.push('/(app)/alert-center')}
+              style={{
+                width: 42, height: 42, borderRadius: 14, backgroundColor: Colors.BACKGROUND_CARD_2,
+                alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.BORDER,
+              }}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.TEXT_PRIMARY} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -305,6 +355,12 @@ export default function DashboardScreen() {
                 key={txn.id}
                 transaction={txn}
                 onPress={() => router.push(`/modals/transaction/${txn.id}`)}
+                storeName={storeNameFor(txn.storeId)}
+                onReturnToGeneral={
+                  user?.role === 'supervisor' && txn.storeId === user.storeId && isTodayLocal(txn.timestamp)
+                    ? () => handleReturnToGeneral(txn)
+                    : undefined
+                }
               />
             ))
           )}
@@ -417,7 +473,7 @@ export default function DashboardScreen() {
                 <View style={{ backgroundColor: Colors.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: Colors.BORDER, paddingHorizontal: 16, overflow: 'hidden' }}>
                   {txnsAll.map((txn, i) => (
                     <View key={txn.id} style={i < txnsAll.length - 1 ? { borderBottomWidth: 1, borderBottomColor: Colors.BORDER } : undefined}>
-                      <VerTodosRow txn={txn} onPress={() => goToDetail(txn.id)} />
+                      <VerTodosRow txn={txn} onPress={() => goToDetail(txn.id)} storeName={storeNameFor(txn.storeId)} />
                     </View>
                   ))}
                 </View>

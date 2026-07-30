@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Animated } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { PaymentColors } from '../../constants/colors';
 import { useTheme } from '../../constants/theme';
@@ -10,6 +11,13 @@ import { Transaction, formatAmount, formatTime } from '../../mocks/transactions'
 interface TransactionItemProps {
   transaction: Transaction;
   onPress?: () => void;
+  // Name of the store this payment is currently assigned to — null/undefined
+  // means it isn't shown (e.g. lists that are already scoped to one store).
+  storeName?: string | null;
+  // When provided, swiping the row to the LEFT reveals a panel that, once
+  // fully open, sends the payment back to GENERAL — the supervisor-facing
+  // mirror of the cajero's "swipe right to claim" gesture in general.tsx.
+  onReturnToGeneral?: () => void;
 }
 
 const methodLabels: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay', manual: 'Manual' };
@@ -25,13 +33,13 @@ const methodLogos: Record<'yape' | 'plin' | 'izipay', any> = {
 // a payment is a deliberate "anular" action (owner only, requires a reason
 // and PIN/CONFIRMAR confirmation), not a quick per-row gesture. That flow
 // lives in the transaction detail screen instead.
-export default function TransactionItem({ transaction, onPress }: TransactionItemProps) {
+export default function TransactionItem({ transaction, onPress, storeName, onReturnToGeneral }: TransactionItemProps) {
   const { c } = useTheme();
   const t = useTranslation();
   const isVoided = transaction.status === 'voided';
   const isEdited = transaction.amount !== transaction.originalAmount;
 
-  return (
+  const card = (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}
       style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.BACKGROUND_CARD, borderRadius: 16, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: c.BORDER }}>
       <Avatar initials={transaction.payerInitials} size="md" />
@@ -49,6 +57,14 @@ export default function TransactionItem({ transaction, onPress }: TransactionIte
             {methodLabels[transaction.method]}
           </Text>
         </View>
+        {!!storeName && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 3 }}>
+            <Ionicons name="business-outline" size={11} color={c.TEXT_SECONDARY} />
+            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular' }} numberOfLines={1}>
+              {storeName}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 3 }}>
         <Text style={{
@@ -66,5 +82,30 @@ export default function TransactionItem({ transaction, onPress }: TransactionIte
         </View>
       </View>
     </TouchableOpacity>
+  );
+
+  if (!onReturnToGeneral) return card;
+
+  const renderRightActions = (_progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+    const scale = dragX.interpolate({ inputRange: [-80, 0], outputRange: [1, 0.5], extrapolate: 'clamp' });
+    return (
+      <View style={{ justifyContent: 'center', alignItems: 'flex-end', width: 96, marginBottom: 8 }}>
+        <Animated.View style={{
+          transform: [{ scale }], width: 88, height: '100%', borderRadius: 16,
+          backgroundColor: c.ACCENT_CYAN, alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}>
+          <Ionicons name="arrow-undo-outline" size={20} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', fontFamily: 'Inter_700Bold', textAlign: 'center' }}>
+            {t.transaction.actions.returnToGeneral}
+          </Text>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  return (
+    <Swipeable renderRightActions={renderRightActions} onSwipeableOpen={onReturnToGeneral} overshootRight={false}>
+      {card}
+    </Swipeable>
   );
 }

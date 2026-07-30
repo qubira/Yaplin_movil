@@ -117,8 +117,6 @@ interface PaymentsCtxValue {
   markAllRead: () => void;
   routeTransaction: (id: string, toStoreId: string | null, version: number) => Promise<Transaction>;
   correctAmount: (id: string, delta: number, reason: string, version: number, confirm: ConfirmationInput) => Promise<Transaction>;
-  voidTransaction: (id: string, reason: string, version: number, confirm: ConfirmationInput) => Promise<Transaction>;
-  reverseVoid: (id: string, reason: string, version: number) => Promise<Transaction>;
   createManualTransaction: (input: ManualTransactionInput) => Promise<Transaction>;
   fetchGeneralPool: () => Promise<Transaction[]>;
   fetchTransactionEvents: (id: string) => Promise<TransactionEvent[]>;
@@ -241,18 +239,6 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
       setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
       return updated;
     },
-    voidTransaction: async (id, reason, version, confirm) => {
-      const saved = await api.post<RemoteTransaction>(`/transactions/${id}/void`, { reason, version, ...confirm });
-      const updated = fromRemote(saved);
-      setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
-      return updated;
-    },
-    reverseVoid: async (id, reason, version) => {
-      const saved = await api.post<RemoteTransaction>(`/transactions/${id}/void-reverse`, { reason, version });
-      const updated = fromRemote(saved);
-      setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
-      return updated;
-    },
     createManualTransaction: async (input) => {
       const saved = await api.post<RemoteTransaction>('/transactions/manual', input);
       const created = fromRemote(saved);
@@ -290,11 +276,11 @@ function usePaymentsContext(): PaymentsCtxValue {
 export function useTransactions() {
   const {
     transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
-    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
+    routeTransaction, correctAmount, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
   } = usePaymentsContext();
   return {
     transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
-    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
+    routeTransaction, correctAmount, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
   };
 }
 

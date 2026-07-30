@@ -219,21 +219,22 @@ export default function StoresScreen() {
     <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topInset, borderBottomColor: c.BORDER }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: c.TEXT_PRIMARY }]}>{t.stores.header.title}</Text>
-          <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{t.stores.header.subtitle(activeCount, stores.length)}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {/* Header — theme toggle at the far left (opposite end from the add
+          button), not bunched together with it */}
+      <View style={[styles.header, { paddingTop: topInset, borderBottomColor: c.BORDER, justifyContent: 'space-between' }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <ThemeToggle />
-          {isOwner && (
-            <TouchableOpacity onPress={() => setAddModal(true)}
-              style={[styles.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
-              <Ionicons name="add" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
+          <View>
+            <Text style={[styles.headerTitle, { color: c.TEXT_PRIMARY }]}>{t.stores.header.title}</Text>
+            <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{t.stores.header.subtitle(activeCount, stores.length)}</Text>
+          </View>
         </View>
+        {isOwner && (
+          <TouchableOpacity onPress={() => setAddModal(true)}
+            style={[styles.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
+            <Ionicons name="add" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>

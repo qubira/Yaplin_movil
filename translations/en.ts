@@ -307,8 +307,7 @@ const en: typeof es = {
     actions: {
       move: 'Move payment',
       correctAmount: 'Correct amount',
-      void: 'Void payment',
-      reverseVoid: 'Reverse void',
+      returnToGeneral: 'Send to General',
     },
     moveModal: {
       title: 'Move payment',
@@ -472,6 +471,30 @@ const en: typeof es = {
       ACCOUNT_AUTO_BLOCKED: 'Account auto-blocked',
     },
     loadError: 'Could not load alerts.',
+    detail: {
+      generalStore: 'No store assigned',
+      unknownActor: 'Unknown user',
+      actionAttempted: (action: string) => `Attempted: ${action}`,
+      actionLabels: {
+        VOID: 'void a payment',
+        CORRECT_AMOUNT: 'correct an amount',
+        MANUAL_CREATE: 'create a manual payment',
+        VOID_REVERSE: 'reverse a void',
+        CREATE_TEAM_MEMBER: 'create a team member',
+        EDIT_TEAM_MEMBER: 'edit a team member',
+      },
+    },
+    filters: {
+      searchPlaceholder: 'Search by name...',
+      period: {
+        today: 'Today',
+        week: 'Week',
+        month: 'Month',
+        all: 'All',
+      },
+      severityAll: 'All',
+      noResults: 'No alerts match these filters.',
+    },
   },
 };
 

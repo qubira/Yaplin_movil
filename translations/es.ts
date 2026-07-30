@@ -305,8 +305,7 @@ const es = {
     actions: {
       move: 'Mover pago',
       correctAmount: 'Corregir monto',
-      void: 'Anular pago',
-      reverseVoid: 'Revertir anulación',
+      returnToGeneral: 'Enviar a General',
     },
     moveModal: {
       title: 'Mover pago',
@@ -470,6 +469,30 @@ const es = {
       ACCOUNT_AUTO_BLOCKED: 'Cuenta bloqueada automáticamente',
     },
     loadError: 'No se pudieron cargar las alertas.',
+    detail: {
+      generalStore: 'Sin tienda asignada',
+      unknownActor: 'Usuario desconocido',
+      actionAttempted: (action: string) => `Intentó: ${action}`,
+      actionLabels: {
+        VOID: 'anular un pago',
+        CORRECT_AMOUNT: 'corregir un monto',
+        MANUAL_CREATE: 'crear un pago manual',
+        VOID_REVERSE: 'revertir una anulación',
+        CREATE_TEAM_MEMBER: 'crear un miembro del equipo',
+        EDIT_TEAM_MEMBER: 'editar un miembro del equipo',
+      },
+    },
+    filters: {
+      searchPlaceholder: 'Buscar por nombre...',
+      period: {
+        today: 'Hoy',
+        week: 'Semana',
+        month: 'Mes',
+        all: 'Todo',
+      },
+      severityAll: 'Todas',
+      noResults: 'No hay alertas con estos filtros.',
+    },
   },
 };
 
