@@ -1,4 +1,5 @@
-import { View, Text, SectionList, TouchableOpacity, Image } from 'react-native';
+import { useState } from 'react';
+import { View, Text, SectionList, TouchableOpacity, Image, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +10,7 @@ import { useTransactions } from '../../store/PaymentsStore';
 import { useTranslation } from '../../store/LocaleStore';
 import EmptyState from '../../components/ui/EmptyState';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import RefreshButton from '../../components/ui/RefreshButton';
 import { useTopInset } from '../../hooks/useTopInset';
 
 const methodLogos: Record<'yape' | 'plin' | 'izipay', any> = {
@@ -24,7 +26,14 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(20);
   const t = useTranslation();
-  const { transactions: notifications, markAllRead } = useTransactions();
+  const { transactions: notifications, markAllRead, refreshTransactions } = useTransactions();
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await refreshTransactions().catch(() => {});
+    setRefreshing(false);
+  }
 
   const now = new Date();
 
@@ -86,6 +95,7 @@ export default function NotificationsScreen() {
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
+          <RefreshButton onRefresh={handleRefresh} />
           <TouchableOpacity onPress={markAllRead}>
             <Text style={{ color: c.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.notifications.markAllRead}</Text>
           </TouchableOpacity>
@@ -106,6 +116,7 @@ export default function NotificationsScreen() {
           )}
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 100 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={c.ACCENT_CYAN} />}
         />
       )}
     </View>

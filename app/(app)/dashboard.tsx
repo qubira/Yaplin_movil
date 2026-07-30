@@ -21,6 +21,7 @@ import TransactionItem from '../../components/ui/TransactionItem';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import BrandLoader from '../../components/ui/BrandLoader';
+import RefreshButton from '../../components/ui/RefreshButton';
 
 // Local, device-time approximation of "today" — same convention already
 // used by routeOptions() in app/modals/transaction/[id].tsx: the client only
@@ -333,11 +334,14 @@ export default function DashboardScreen() {
             <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>
               {periodo === 'Hoy' ? t.dashboard.recentPayments : t.dashboard.periodPayments}
             </Text>
-            {txnsAll.length > 0 && (
-              <TouchableOpacity onPress={() => setVerTodos(true)}>
-                <Text style={{ color: Colors.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.dashboard.viewAll}</Text>
-              </TouchableOpacity>
-            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <RefreshButton onRefresh={refreshTransactions} size={30} />
+              {txnsAll.length > 0 && (
+                <TouchableOpacity onPress={() => setVerTodos(true)}>
+                  <Text style={{ color: Colors.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.dashboard.viewAll}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {transactionsLoading ? (

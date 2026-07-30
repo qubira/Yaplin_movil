@@ -20,6 +20,7 @@ import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import RefreshButton from '../../components/ui/RefreshButton';
 
 const METHOD_LOGOS = {
   yape:   require('../../assets/images/brands/yape.png'),
@@ -182,17 +183,24 @@ export default function StoresScreen() {
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(16);
   const t = useTranslation();
-  const { stores, storesLoading, addStore, updateStore, removeStore } = useStores();
+  const { stores, storesLoading, refreshStores, addStore, updateStore, removeStore } = useStores();
   const { team } = useTeam();
-  const { transactions } = useTransactions();
+  const { transactions, refreshTransactions } = useTransactions();
   const { user } = useAuth();
   const isOwner = user?.role === 'owner';
 
   const [addModal, setAddModal] = useState(false);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [historySearch, setHistorySearch] = useState('');
 
   const selectedStore = stores.find(s => s.id === selectedStoreId) ?? null;
+
+  useEffect(() => { setHistorySearch(''); }, [selectedStoreId]);
+
+  async function refreshStoresView() {
+    await Promise.all([refreshStores(), refreshTransactions()]);
+  }
 
   const revenueByStore = useMemo(() => {
     const map: Record<string, StoreRevenue> = {};
@@ -229,12 +237,15 @@ export default function StoresScreen() {
             <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{t.stores.header.subtitle(activeCount, stores.length)}</Text>
           </View>
         </View>
-        {isOwner && (
-          <TouchableOpacity onPress={() => setAddModal(true)}
-            style={[styles.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
-            <Ionicons name="add" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <RefreshButton onRefresh={refreshStoresView} />
+          {isOwner && (
+            <TouchableOpacity onPress={() => setAddModal(true)}
+              style={[styles.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
@@ -300,6 +311,9 @@ export default function StoresScreen() {
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <Text style={[styles.headerTitle, { color: c.TEXT_PRIMARY }]}>{selectedStore.name}</Text>
                 <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{selectedStore.address || t.stores.noAddress}</Text>
+              </View>
+              <View style={{ marginRight: isOwner ? 8 : 0 }}>
+                <RefreshButton onRefresh={refreshStoresView} size={38} />
               </View>
               {isOwner && (
                 <>
@@ -379,17 +393,37 @@ export default function StoresScreen() {
                   (cajero: today, supervisor: last 90 days, owner: unlimited),
                   so this just filters the already-loaded list by store. */}
               <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.historyLabel}</Text>
-              {transactions
-                .filter(txn => txn.storeId === selectedStore.id)
-                .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-                .map(txn => (
-                  <TransactionItem key={txn.id} transaction={txn} onPress={() => router.push(`/modals/transaction/${txn.id}`)} />
-                ))}
-              {transactions.filter(txn => txn.storeId === selectedStore.id).length === 0 && (
-                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
-                  {t.stores.noHistory}
-                </Text>
-              )}
+              <Input
+                placeholder={t.stores.historySearchPlaceholder}
+                value={historySearch}
+                onChangeText={setHistorySearch}
+                leftIcon="search-outline"
+              />
+              <View style={{ height: 10 }} />
+              {(() => {
+                const storeHistory = transactions.filter(txn => txn.storeId === selectedStore.id);
+                const query = historySearch.trim().toLowerCase();
+                const filteredHistory = query ? storeHistory.filter(txn => txn.payerName.toLowerCase().includes(query)) : storeHistory;
+                if (storeHistory.length === 0) {
+                  return (
+                    <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
+                      {t.stores.noHistory}
+                    </Text>
+                  );
+                }
+                if (filteredHistory.length === 0) {
+                  return (
+                    <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
+                      {t.stores.noHistoryResults}
+                    </Text>
+                  );
+                }
+                return filteredHistory
+                  .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+                  .map(txn => (
+                    <TransactionItem key={txn.id} transaction={txn} onPress={() => router.push(`/modals/transaction/${txn.id}`)} />
+                  ));
+              })()}
             </ScrollView>
           </View>
         )}

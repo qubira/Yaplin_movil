@@ -14,6 +14,7 @@ import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import RefreshButton from '../../components/ui/RefreshButton';
 import { dictionaries } from '../../translations';
 
 function roleConfig(t: typeof dictionaries['es']) {
@@ -252,7 +253,7 @@ export default function TeamScreen() {
   const t = useTranslation();
   const ROLE_CONFIG = roleConfig(t);
   const PERM_BY_ROLE = permByRole(t);
-  const { team, teamLoading, addMember, updateMember, removeMember } = useTeam();
+  const { team, teamLoading, refreshTeam, addMember, updateMember, removeMember } = useTeam();
   const { stores } = useStores();
   const { user } = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -290,12 +291,15 @@ export default function TeamScreen() {
             <Text style={[s.headerSub, { color: c.TEXT_SECONDARY }]}>{t.team.header.subtitle(active, team.length)}</Text>
           </View>
         </View>
-        {(user?.role === 'owner' || user?.role === 'supervisor') && (
-          <TouchableOpacity onPress={() => setAddModal(true)}
-            style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
-            <Ionicons name="person-add-outline" size={18} color="#fff" />
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <RefreshButton onRefresh={refreshTeam} />
+          {(user?.role === 'owner' || user?.role === 'supervisor') && (
+            <TouchableOpacity onPress={() => setAddModal(true)}
+              style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
+              <Ionicons name="person-add-outline" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 20 }}>

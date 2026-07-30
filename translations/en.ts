@@ -225,7 +225,9 @@ const en: typeof es = {
     assignedTeamLabel: 'Assigned team',
     paymentMethodsLabel: 'Payment methods',
     historyLabel: 'Payment history',
+    historySearchPlaceholder: 'Search by name...',
     noHistory: 'No payments to show in your allowed date range.',
+    noHistoryResults: 'No payment matches that search.',
     addStoreTitle: 'Add store',
     editStoreTitle: 'Edit store',
     deleteAlert: {

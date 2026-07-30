@@ -17,6 +17,7 @@ import { useTopInset } from '../../hooks/useTopInset';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import EmptyState from '../../components/ui/EmptyState';
+import RefreshButton from '../../components/ui/RefreshButton';
 
 // A manually-entered payment always has a real storeId (POST
 // /transactions/manual requires one), so it can never actually appear in
@@ -188,12 +189,15 @@ export default function GeneralScreen() {
             {t.general.headerSubtitle(items.length)}
           </Text>
         </View>
-        {user?.role === 'owner' && (
-          <TouchableOpacity onPress={() => router.push('/(app)/manual-entry')}
-            style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: c.ACCENT_PURPLE, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <RefreshButton onRefresh={() => load()} />
+          {user?.role === 'owner' && (
+            <TouchableOpacity onPress={() => router.push('/(app)/manual-entry')}
+              style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: c.ACCENT_PURPLE, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="add" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView

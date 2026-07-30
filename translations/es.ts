@@ -223,7 +223,9 @@ const es = {
     assignedTeamLabel: 'Equipo asignado',
     paymentMethodsLabel: 'Métodos de pago',
     historyLabel: 'Historial de pagos',
+    historySearchPlaceholder: 'Buscar por nombre...',
     noHistory: 'Sin pagos para mostrar en tu rango de fechas permitido.',
+    noHistoryResults: 'Ningún pago coincide con esa búsqueda.',
     addStoreTitle: 'Agregar tienda',
     editStoreTitle: 'Editar tienda',
     deleteAlert: {

@@ -349,6 +349,7 @@ export default function TransactionDetailScreen() {
   const [events, setEvents] = useState<TransactionEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState(false);
+  const [refreshingDetail, setRefreshingDetail] = useState(false);
 
   const loadEvents = useCallback(async () => {
     if (!id) return;
@@ -444,6 +445,13 @@ export default function TransactionDetailScreen() {
     if (id && !transactions.some(t => t.id === id)) {
       await fetchTransactionById(id).then(setFetchedTransaction).catch(() => {});
     }
+  }
+
+  async function handleManualRefresh() {
+    if (refreshingDetail) return;
+    setRefreshingDetail(true);
+    await Promise.all([refreshCurrentTransaction(), loadEvents()]);
+    setRefreshingDetail(false);
   }
 
   function openActionModal(kind: 'move' | 'correct') {
@@ -572,10 +580,20 @@ export default function TransactionDetailScreen() {
               style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="chevron-back" size={22} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={toggle}
-              style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name={c.isDark ? 'sunny-outline' : 'moon-outline'} size={20} color="#fff" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity onPress={handleManualRefresh} disabled={refreshingDetail}
+                style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+                {refreshingDetail ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="refresh-outline" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggle}
+                style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name={c.isDark ? 'sunny-outline' : 'moon-outline'} size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={{ width: 96, height: 96, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: `${brand.color}55`, marginBottom: 20, shadowColor: brand.color, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 12 }}>
             {brand.logo ? (

@@ -13,6 +13,7 @@ import { api, ApiError } from '../../services/api';
 import { useTopInset } from '../../hooks/useTopInset';
 import BrandLoader from '../../components/ui/BrandLoader';
 import EmptyState from '../../components/ui/EmptyState';
+import RefreshButton from '../../components/ui/RefreshButton';
 
 type Severity = 'low' | 'medium' | 'high' | 'critical';
 type EventType = 'LOGIN_FAILED' | 'BLOCKED_STORE_ACCESS' | 'BLOCKED_ROLE_ACTION' | 'WRONG_CONFIRMATION' | 'RISK_ESCALATED' | 'ACCOUNT_AUTO_BLOCKED';
@@ -192,10 +193,11 @@ export default function AlertCenterScreen() {
     <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
-      <View style={{ paddingTop: topInset, paddingHorizontal: 24, paddingBottom: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: topInset, paddingHorizontal: 24, paddingBottom: 16 }}>
         <Text style={{ color: c.TEXT_PRIMARY, fontSize: 22, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>
           {t.alertCenter.title}
         </Text>
+        {!(user?.role === 'cajero' || forbidden) && <RefreshButton onRefresh={() => load()} />}
       </View>
 
       {user?.role === 'cajero' || forbidden ? (
