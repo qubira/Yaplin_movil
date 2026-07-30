@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState, Modal, KeyboardAvoidingView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -193,47 +193,52 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
-          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-          <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>{title}</Text>
-          {mode === 'save' && (
-            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-              {t.settings.pinModal.description}
-            </Text>
-          )}
-          <Input
-            label={t.settings.pinModal.passwordLabel}
-            placeholder={t.settings.pinModal.passwordPlaceholder}
-            value={password}
-            onChangeText={setPassword}
-            isPassword
-            leftIcon="lock-closed-outline"
-          />
-          {mode === 'save' && (
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>{title}</Text>
+            {mode === 'save' && (
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+                {t.settings.pinModal.description}
+              </Text>
+            )}
             <Input
-              label={t.settings.pinModal.newPinLabel}
-              placeholder={t.settings.pinModal.newPinPlaceholder}
-              value={newPin}
-              onChangeText={(v) => setNewPin(v.replace(/[^0-9]/g, '').slice(0, 8))}
-              keyboardType="number-pad"
-              secureTextEntry
-              leftIcon="keypad-outline"
+              label={t.settings.pinModal.passwordLabel}
+              placeholder={t.settings.pinModal.passwordPlaceholder}
+              value={password}
+              onChangeText={setPassword}
+              isPassword
+              leftIcon="lock-closed-outline"
             />
-          )}
-          {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
-          <TouchableOpacity onPress={handleSubmit} disabled={saving}
-            style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === 'remove' ? c.ACCENT_RED : c.ACCENT_PURPLE, opacity: saving ? 0.7 : 1 }}>
-            <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>
-              {saving ? t.common.actions.saving : mode === 'remove' ? t.settings.pinModal.removeButton : t.settings.pinModal.save}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onClose}
-            style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-            <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.pinModal.cancel}</Text>
-          </TouchableOpacity>
+            {mode === 'save' && (
+              <Input
+                label={t.settings.pinModal.newPinLabel}
+                placeholder={t.settings.pinModal.newPinPlaceholder}
+                value={newPin}
+                onChangeText={(v) => setNewPin(v.replace(/[^0-9]/g, '').slice(0, 8))}
+                keyboardType="number-pad"
+                secureTextEntry
+                leftIcon="keypad-outline"
+              />
+            )}
+            {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
+            <TouchableOpacity onPress={handleSubmit} disabled={saving}
+              style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === 'remove' ? c.ACCENT_RED : c.ACCENT_PURPLE, opacity: saving ? 0.7 : 1 }}>
+              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>
+                {saving ? t.common.actions.saving : mode === 'remove' ? t.settings.pinModal.removeButton : t.settings.pinModal.save}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose}
+              style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.pinModal.cancel}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

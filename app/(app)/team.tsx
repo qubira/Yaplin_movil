@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Switch, Platform, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -169,8 +169,12 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <View style={[s.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20 }]}>
+        <View style={[s.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%' }]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={[s.sheetHandle, { backgroundColor: c.BORDER }]} />
             <Text style={[s.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
@@ -242,6 +246,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

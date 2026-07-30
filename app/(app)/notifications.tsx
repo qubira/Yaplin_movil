@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, SectionList, TouchableOpacity, Image, RefreshControl } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -90,9 +91,15 @@ export default function NotificationsScreen() {
 
       {/* Header */}
       <View style={{ paddingTop: topInset, paddingHorizontal: 24, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ color: c.TEXT_PRIMARY, fontSize: 24, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>
-          {t.notifications.header.title}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => router.back()}
+            style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: c.BACKGROUND_CARD_2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.BORDER }}>
+            <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
+          </TouchableOpacity>
+          <Text style={{ color: c.TEXT_PRIMARY, fontSize: 24, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>
+            {t.notifications.header.title}
+          </Text>
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
           <RefreshButton onRefresh={handleRefresh} />

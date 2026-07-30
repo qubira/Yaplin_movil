@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -135,8 +135,12 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <View style={[styles.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20 }]}>
+        <View style={[styles.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%' }]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={[styles.sheetHandle, { backgroundColor: c.BORDER }]} />
             <Text style={[styles.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
@@ -174,6 +178,7 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -326,6 +331,10 @@ export default function StoresScreen() {
                 </>
               )}
             </View>
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
 
               {/* Account info */}
@@ -425,6 +434,7 @@ export default function StoresScreen() {
                   ));
               })()}
             </ScrollView>
+            </KeyboardAvoidingView>
           </View>
         )}
       </Modal>

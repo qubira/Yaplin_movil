@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, RefreshControl, TextInput, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -194,9 +195,15 @@ export default function AlertCenterScreen() {
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: topInset, paddingHorizontal: 24, paddingBottom: 16 }}>
-        <Text style={{ color: c.TEXT_PRIMARY, fontSize: 22, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>
-          {t.alertCenter.title}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => router.back()}
+            style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: c.BACKGROUND_CARD_2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.BORDER }}>
+            <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
+          </TouchableOpacity>
+          <Text style={{ color: c.TEXT_PRIMARY, fontSize: 22, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>
+            {t.alertCenter.title}
+          </Text>
+        </View>
         {!(user?.role === 'cajero' || forbidden) && <RefreshButton onRefresh={() => load()} />}
       </View>
 

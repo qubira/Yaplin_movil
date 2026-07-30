@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, ReactNode } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Share, Image,
-  Modal, LayoutAnimation, Platform, UIManager, Linking, ActivityIndicator,
+  Modal, LayoutAnimation, Platform, UIManager, Linking, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -155,53 +155,31 @@ function ModalTxnRow({ txn, noBorder }: { txn: Transaction; noBorder?: boolean }
   );
 }
 
-// The literal text the backend accepts as confirmation when the owner
-// hasn't configured a PIN — matches CONFIRM_TEXT in
-// backend/src/routes/transactions.ts exactly.
-const CONFIRM_WORD = 'CONFIRMAR';
-
 // Shared double-confirmation input: a PIN keypad if the owner configured
-// one, otherwise a single "Confirmar" toggle button (no typing required) —
-// mirrors verifyConfirmation() in backend/src/routes/transactions.ts
-// exactly, so the UI asks for whichever the backend will actually check.
+// one, otherwise a plain "type CONFIRMAR" text field — mirrors
+// verifyConfirmation() in backend/src/routes/transactions.ts exactly, so the
+// UI asks for whichever the backend will actually check.
 function ConfirmField({ hasPin, value, onChangeText }: { hasPin: boolean; value: string; onChangeText: (v: string) => void }) {
-  const { c } = useTheme();
   const t = useTranslation();
-  if (hasPin) {
-    return (
-      <Input
-        label={t.transaction.confirmStep.pinTitle}
-        placeholder={t.transaction.confirmStep.pinPlaceholder}
-        value={value}
-        onChangeText={(v) => onChangeText(v.replace(/[^0-9]/g, '').slice(0, 8))}
-        keyboardType="number-pad"
-        secureTextEntry
-        leftIcon="keypad-outline"
-      />
-    );
-  }
-  const confirmed = value === CONFIRM_WORD;
-  return (
-    <View style={{ marginBottom: 4 }}>
-      <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>
-        {t.transaction.confirmStep.textTitle}
-      </Text>
-      <TouchableOpacity
-        onPress={() => onChangeText(confirmed ? '' : CONFIRM_WORD)}
-        activeOpacity={0.85}
-        style={{
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-          height: 52, borderRadius: 14, borderWidth: 1,
-          backgroundColor: confirmed ? `${c.SUCCESS}18` : c.BACKGROUND_CARD_2,
-          borderColor: confirmed ? c.SUCCESS : c.BORDER,
-        }}
-      >
-        <Ionicons name={confirmed ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={confirmed ? c.SUCCESS : c.TEXT_SECONDARY} />
-        <Text style={{ color: confirmed ? c.SUCCESS : c.TEXT_PRIMARY, fontWeight: '600', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>
-          {t.transaction.confirmStep.submit}
-        </Text>
-      </TouchableOpacity>
-    </View>
+  return hasPin ? (
+    <Input
+      label={t.transaction.confirmStep.pinTitle}
+      placeholder={t.transaction.confirmStep.pinPlaceholder}
+      value={value}
+      onChangeText={(v) => onChangeText(v.replace(/[^0-9]/g, '').slice(0, 8))}
+      keyboardType="number-pad"
+      secureTextEntry
+      leftIcon="keypad-outline"
+    />
+  ) : (
+    <Input
+      label={t.transaction.confirmStep.textDescription(t.transaction.confirmStep.textPlaceholder)}
+      placeholder={t.transaction.confirmStep.textPlaceholder}
+      value={value}
+      onChangeText={onChangeText}
+      autoCapitalize="characters"
+      leftIcon="checkmark-done-outline"
+    />
   );
 }
 
@@ -285,6 +263,10 @@ function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, subm
   const t = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%' }}>
           <ScrollView keyboardShouldPersistTaps="handled">
@@ -305,6 +287,7 @@ function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, subm
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
