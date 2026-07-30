@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAuth, requireOwner } from '../auth';
 import { AUDIT_ORIGIN, normalizeEmail, requestIp, writeAuditLog } from '../audit';
+import { logBlockedIntent } from '../security';
 
 const router = Router();
 router.use(requireAuth);
@@ -82,12 +83,65 @@ router.post('/', requireOwner, async (req, res) => {
   }
 });
 
-router.put('/:id', requireOwner, async (req, res) => {
-  const existing = await prisma.user.findFirst({ where: { id: req.params.id, businessId: req.auth!.businessId } });
+// Editing a team member is no longer owner-only: a supervisor may edit
+// their own name/password, and a cajero's name/password/storeId/active —
+// but never a role field (own or anyone else's — role changes stay
+// owner-only, since letting a supervisor touch roles is a privilege-
+// escalation path), and never another supervisor's or the owner's profile.
+// A cajero can't edit anyone, including themselves.
+function allowedTeamEditFields(
+  actorRole: 'owner' | 'supervisor' | 'cajero',
+  isSelf: boolean,
+  targetRole: string
+): string[] | null {
+  if (actorRole === 'owner') return null; // null = unrestricted
+  if (actorRole === 'cajero') return [];
+  // supervisor
+  if (isSelf) return ['name', 'password'];
+  if (targetRole === 'cajero') return ['name', 'password', 'storeId', 'active'];
+  return []; // another supervisor, or the owner
+}
+
+router.put('/:id', async (req, res) => {
+  const auth = req.auth!;
+  const existing = await prisma.user.findFirst({ where: { id: req.params.id, businessId: auth.businessId } });
   if (!existing) return res.status(404).json({ error: 'Miembro no encontrado' });
 
   const { name, email: rawEmail, password, role, storeId, active } = req.body ?? {};
   const email = rawEmail !== undefined ? normalizeEmail(rawEmail) : undefined;
+  const normalizedStoreId = storeId !== undefined ? (storeId === 'all' || !storeId ? null : storeId) : undefined;
+
+  // Gate on which fields are actually CHANGING in value, not just which keys
+  // the client happened to send — the mobile form always resubmits the full
+  // record (name/email/role/storeId together) even when only one field was
+  // edited, so a raw key-presence check would block every supervisor edit
+  // outright, including ones that don't touch a restricted field at all.
+  const isSelf = existing.id === auth.userId;
+  const allowedFields = allowedTeamEditFields(auth.role, isSelf, existing.role);
+  if (allowedFields !== null) {
+    const changedFields: string[] = [];
+    if (name !== undefined && name !== existing.name) changedFields.push('name');
+    if (email !== undefined && email !== existing.email) changedFields.push('email');
+    if (role !== undefined && role !== existing.role) changedFields.push('role');
+    if (normalizedStoreId !== undefined && normalizedStoreId !== existing.storeId) changedFields.push('storeId');
+    if (active !== undefined && active !== existing.active) changedFields.push('active');
+    if (password) changedFields.push('password');
+
+    const disallowed = changedFields.filter((f) => !allowedFields.includes(f));
+    if ((changedFields.length > 0 && allowedFields.length === 0) || disallowed.length > 0) {
+      await logBlockedIntent({
+        businessId: auth.businessId,
+        userId: auth.userId,
+        actorEmail: auth.email,
+        eventType: 'BLOCKED_ROLE_ACTION',
+        severity: 'high',
+        detail: { actionAttempted: 'EDIT_TEAM_MEMBER', targetUserId: existing.id, targetRole: existing.role, isSelf, changedFields, disallowedFields: disallowed },
+        ipAddress: requestIp(req),
+        userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+      });
+      return res.status(403).json({ error: 'No tienes permiso para editar estos datos.' });
+    }
+  }
 
   if (email !== undefined && email !== existing.email) {
     const emailTaken = await prisma.user.findUnique({ where: { email } });
@@ -98,7 +152,7 @@ router.put('/:id', requireOwner, async (req, res) => {
   if (name !== undefined) { data.name = name; data.initials = initialsOf(name); }
   if (email !== undefined) data.email = email;
   if (role !== undefined) data.role = role;
-  if (storeId !== undefined) data.storeId = storeId === 'all' || !storeId ? null : storeId;
+  if (normalizedStoreId !== undefined) data.storeId = normalizedStoreId;
   if (active !== undefined) data.active = active;
   if (password) data.passwordHash = await bcrypt.hash(password, 10);
 
@@ -106,8 +160,8 @@ router.put('/:id', requireOwner, async (req, res) => {
   if (name !== undefined && name !== existing.name) fieldChanges.name = { old: existing.name, new: name };
   if (email !== undefined && email !== existing.email) fieldChanges.email = { old: existing.email, new: email };
   if (role !== undefined && role !== existing.role) fieldChanges.role = { old: existing.role, new: role };
-  if (storeId !== undefined && (data.storeId as string | null) !== existing.storeId) {
-    fieldChanges.storeId = { old: existing.storeId, new: data.storeId as string | null };
+  if (normalizedStoreId !== undefined && normalizedStoreId !== existing.storeId) {
+    fieldChanges.storeId = { old: existing.storeId, new: normalizedStoreId };
   }
 
   try {

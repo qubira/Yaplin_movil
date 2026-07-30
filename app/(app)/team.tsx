@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../constants/theme';
 import { TeamMember } from '../../mocks/stores';
 import { useTeam, useStores } from '../../store/StoresStore';
+import { useAuth } from '../../store/AuthStore';
 import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
 import { ApiError } from '../../services/api';
@@ -47,6 +48,27 @@ function permByRole(t: typeof dictionaries['es']): Record<TeamMember['role'], { 
       { label: t.team.permissions.receiveNotifications, allowed: true },
     ],
   };
+}
+
+// Client-side mirror of allowedTeamEditFields() in
+// backend/src/routes/team.ts — used only to decide what to show/hide in the
+// edit form; the backend re-checks everything itself regardless of what
+// this renders. A cajero can never edit anyone (incl. themselves); a
+// supervisor may edit their own name/password only, or a cajero's
+// name/password/store/active — never a role field, and never another
+// supervisor's or the owner's profile.
+function memberEditPermissions(
+  viewerRole: TeamMember['role'] | undefined,
+  viewerId: string | undefined,
+  target: TeamMember
+): { canEdit: boolean; canEditRole: boolean; canEditStore: boolean } {
+  if (viewerRole === 'owner') return { canEdit: true, canEditRole: true, canEditStore: true };
+  const isSelf = viewerId === target.id;
+  if (viewerRole === 'supervisor') {
+    if (isSelf) return { canEdit: true, canEditRole: false, canEditStore: false };
+    if (target.role === 'cajero') return { canEdit: true, canEditRole: false, canEditStore: true };
+  }
+  return { canEdit: false, canEditRole: false, canEditStore: false };
 }
 
 function MemberCard({ member, storeName, onPress }: { member: TeamMember; storeName: string; onPress: () => void }) {
@@ -95,13 +117,15 @@ interface MemberFormData {
   password?: string;
 }
 
-function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, title }: {
+function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, title, canEditRole = true, canEditStore = true }: {
   visible: boolean;
   onClose: () => void;
   initial: TeamMember | null;
   storeOptions: { id: string; name: string }[];
   onSubmit: (data: MemberFormData) => Promise<void>;
   title: string;
+  canEditRole?: boolean;
+  canEditStore?: boolean;
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -164,35 +188,43 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
               />
             </View>
 
-            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.form.roleSectionTitle}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {(['owner', 'supervisor', 'cajero'] as TeamMember['role'][]).map(r => {
-                const active = role === r;
-                const rc = ROLE_CONFIG[r];
-                return (
-                  <TouchableOpacity key={r} onPress={() => setRole(r)} activeOpacity={0.8}
-                    style={{ flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1, backgroundColor: active ? `${c.ACCENT_PURPLE}18` : c.BACKGROUND_CARD_2, borderColor: active ? `${c.ACCENT_PURPLE}55` : c.BORDER }}>
-                    <Ionicons name={rc.icon} size={18} color={active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY} />
-                    <Text style={{ color: active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
-                      {rc.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {canEditRole && (
+              <>
+                <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.form.roleSectionTitle}</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {(['owner', 'supervisor', 'cajero'] as TeamMember['role'][]).map(r => {
+                    const active = role === r;
+                    const rc = ROLE_CONFIG[r];
+                    return (
+                      <TouchableOpacity key={r} onPress={() => setRole(r)} activeOpacity={0.8}
+                        style={{ flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1, backgroundColor: active ? `${c.ACCENT_PURPLE}18` : c.BACKGROUND_CARD_2, borderColor: active ? `${c.ACCENT_PURPLE}55` : c.BORDER }}>
+                        <Ionicons name={rc.icon} size={18} color={active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY} />
+                        <Text style={{ color: active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
+                          {rc.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
-            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {[{ id: 'all', name: t.team.allStores }, ...storeOptions].map(opt => {
-                const active = storeId === opt.id;
-                return (
-                  <TouchableOpacity key={opt.id} onPress={() => setStoreId(opt.id)} activeOpacity={0.8}
-                    style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
-                    <Text style={{ color: active ? '#fff' : c.TEXT_SECONDARY, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{opt.name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {canEditStore && (
+              <>
+                <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[{ id: 'all', name: t.team.allStores }, ...storeOptions].map(opt => {
+                    const active = storeId === opt.id;
+                    return (
+                      <TouchableOpacity key={opt.id} onPress={() => setStoreId(opt.id)} activeOpacity={0.8}
+                        style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
+                        <Text style={{ color: active ? '#fff' : c.TEXT_SECONDARY, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{opt.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
             {!!error && (
               <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 16 }}>{error}</Text>
@@ -222,12 +254,15 @@ export default function TeamScreen() {
   const PERM_BY_ROLE = permByRole(t);
   const { team, teamLoading, addMember, updateMember, removeMember } = useTeam();
   const { stores } = useStores();
+  const { user } = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addModal, setAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   const selected = team.find(m => m.id === selectedId) ?? null;
   const active = team.filter(m => m.active).length;
+  const selectedEditPerms = selected ? memberEditPermissions(user?.role, user?.id, selected) : null;
+  const editingPerms = editingMember ? memberEditPermissions(user?.role, user?.id, editingMember) : null;
 
   function storeNameFor(storeId: string) {
     if (storeId === 'all') return t.team.allStores;
@@ -253,10 +288,12 @@ export default function TeamScreen() {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
-          <TouchableOpacity onPress={() => setAddModal(true)}
-            style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
-            <Ionicons name="person-add-outline" size={18} color="#fff" />
-          </TouchableOpacity>
+          {user?.role === 'owner' && (
+            <TouchableOpacity onPress={() => setAddModal(true)}
+              style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
+              <Ionicons name="person-add-outline" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -327,12 +364,16 @@ export default function TeamScreen() {
                 <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
               </TouchableOpacity>
               <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY, marginLeft: 14, flex: 1 }]}>{t.team.memberDetailTitle}</Text>
-              <TouchableOpacity onPress={() => setEditingMember(selected)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
-                <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(selected)} style={[s.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
-                <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
-              </TouchableOpacity>
+              {selectedEditPerms?.canEdit && (
+                <TouchableOpacity onPress={() => setEditingMember(selected)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
+                  <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
+                </TouchableOpacity>
+              )}
+              {user?.role === 'owner' && (
+                <TouchableOpacity onPress={() => handleDelete(selected)} style={[s.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
+                  <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
+                </TouchableOpacity>
+              )}
             </View>
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
               {/* Profile */}
@@ -407,6 +448,8 @@ export default function TeamScreen() {
         initial={editingMember}
         storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
         title={t.team.editMemberTitle}
+        canEditRole={editingPerms?.canEditRole ?? true}
+        canEditStore={editingPerms?.canEditStore ?? true}
         onSubmit={(data) => editingMember ? updateMember(editingMember.id, data) : Promise.resolve()}
       />
     </View>
