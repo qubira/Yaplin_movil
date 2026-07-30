@@ -300,6 +300,7 @@ export default function DashboardScreen() {
               <TransactionItem
                 key={txn.id}
                 transaction={txn}
+                onPress={() => router.push(`/modals/transaction/${txn.id}`)}
               />
             ))
           )}

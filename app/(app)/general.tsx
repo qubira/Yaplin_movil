@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Modal, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Modal, Image, Alert, Animated } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,7 +37,33 @@ function GeneralRow({ txn, onAssignMine, onAssignTo, canAssignMine, canPick, ass
   const t = useTranslation();
   const color = PaymentColors[txn.method];
 
-  return (
+  // Swiping the row to the right reveals this left-side panel and, once
+  // fully open, assigns the payment straight to the swiper's own store —
+  // the requested "deslizar a la derecha" gesture. Only offered when there
+  // IS a single unambiguous "my store" (cajero always has one; a supervisor
+  // does too unless they oversee all stores, in which case only the picker
+  // button below makes sense). The button stays as a discoverable fallback
+  // for anyone who doesn't find the swipe.
+  const renderLeftActions = canAssignMine
+    ? (_progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+        const scale = dragX.interpolate({ inputRange: [0, 80], outputRange: [0.5, 1], extrapolate: 'clamp' });
+        return (
+          <View style={{ justifyContent: 'center', alignItems: 'flex-start', width: 96, marginBottom: 10 }}>
+            <Animated.View style={{
+              transform: [{ scale }], width: 88, height: '100%', borderRadius: 18,
+              backgroundColor: c.SUCCESS, alignItems: 'center', justifyContent: 'center', gap: 4,
+            }}>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', fontFamily: 'Inter_700Bold', textAlign: 'center' }}>
+                {t.general.assignToMine}
+              </Text>
+            </Animated.View>
+          </View>
+        );
+      }
+    : undefined;
+
+  const card = (
     <TouchableOpacity
       onPress={() => router.push(`/modals/transaction/${txn.id}`)}
       activeOpacity={0.8}
@@ -78,6 +105,14 @@ function GeneralRow({ txn, onAssignMine, onAssignTo, canAssignMine, canPick, ass
         )}
       </View>
     </TouchableOpacity>
+  );
+
+  if (!canAssignMine) return card;
+
+  return (
+    <Swipeable renderLeftActions={renderLeftActions} onSwipeableOpen={() => { if (!assigning) onAssignMine(); }} overshootLeft={false}>
+      {card}
+    </Swipeable>
   );
 }
 
@@ -169,7 +204,7 @@ export default function GeneralScreen() {
               key={txn.id}
               txn={txn}
               assigning={assigningId === txn.id}
-              canAssignMine={user?.role === 'cajero' && !!user.storeId}
+              canAssignMine={(user?.role === 'cajero' || user?.role === 'supervisor') && !!user.storeId}
               canPick={user?.role === 'owner' || user?.role === 'supervisor'}
               onAssignMine={() => { if (user?.storeId) assign(txn, user.storeId); }}
               onAssignTo={() => setPickerTxn(txn)}

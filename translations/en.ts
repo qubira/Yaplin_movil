@@ -224,6 +224,8 @@ const en: typeof es = {
     notificationAccountLabel: 'Notification account',
     assignedTeamLabel: 'Assigned team',
     paymentMethodsLabel: 'Payment methods',
+    historyLabel: 'Payment history',
+    noHistory: 'No payments to show in your allowed date range.',
     addStoreTitle: 'Add store',
     editStoreTitle: 'Edit store',
     deleteAlert: {

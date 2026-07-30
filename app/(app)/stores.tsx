@@ -8,8 +8,11 @@ import { useTheme } from '../../constants/theme';
 import { PaymentColors } from '../../constants/colors';
 import { Store } from '../../mocks/stores';
 import { formatAmount, PaymentMethod } from '../../mocks/transactions';
+import { router } from 'expo-router';
 import { useStores, useTeam } from '../../store/StoresStore';
 import { useTransactions } from '../../store/PaymentsStore';
+import { useAuth } from '../../store/AuthStore';
+import TransactionItem from '../../components/ui/TransactionItem';
 import { useTranslation } from '../../store/LocaleStore';
 import { computeStoreRevenue, StoreRevenue } from '../../services/storeRevenue';
 import { useTopInset } from '../../hooks/useTopInset';
@@ -181,6 +184,8 @@ export default function StoresScreen() {
   const { stores, storesLoading, addStore, updateStore, removeStore } = useStores();
   const { team } = useTeam();
   const { transactions } = useTransactions();
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
 
   const [addModal, setAddModal] = useState(false);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
@@ -221,10 +226,12 @@ export default function StoresScreen() {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
-          <TouchableOpacity onPress={() => setAddModal(true)}
-            style={[styles.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
-            <Ionicons name="add" size={20} color="#fff" />
-          </TouchableOpacity>
+          {isOwner && (
+            <TouchableOpacity onPress={() => setAddModal(true)}
+              style={[styles.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -292,12 +299,16 @@ export default function StoresScreen() {
                 <Text style={[styles.headerTitle, { color: c.TEXT_PRIMARY }]}>{selectedStore.name}</Text>
                 <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{selectedStore.address || t.stores.noAddress}</Text>
               </View>
-              <TouchableOpacity onPress={() => setEditingStore(selectedStore)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
-                <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(selectedStore)} style={[styles.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
-                <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
-              </TouchableOpacity>
+              {isOwner && (
+                <>
+                  <TouchableOpacity onPress={() => setEditingStore(selectedStore)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
+                    <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(selectedStore)} style={[styles.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
+                    <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
 
@@ -361,6 +372,22 @@ export default function StoresScreen() {
                   </View>
                 ))}
               </View>
+
+              {/* Payment history — already scoped by role from the backend
+                  (cajero: today, supervisor: last 90 days, owner: unlimited),
+                  so this just filters the already-loaded list by store. */}
+              <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.historyLabel}</Text>
+              {transactions
+                .filter(txn => txn.storeId === selectedStore.id)
+                .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+                .map(txn => (
+                  <TransactionItem key={txn.id} transaction={txn} onPress={() => router.push(`/modals/transaction/${txn.id}`)} />
+                ))}
+              {transactions.filter(txn => txn.storeId === selectedStore.id).length === 0 && (
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
+                  {t.stores.noHistory}
+                </Text>
+              )}
             </ScrollView>
           </View>
         )}

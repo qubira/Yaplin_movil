@@ -122,6 +122,7 @@ interface PaymentsCtxValue {
   createManualTransaction: (input: ManualTransactionInput) => Promise<Transaction>;
   fetchGeneralPool: () => Promise<Transaction[]>;
   fetchTransactionEvents: (id: string) => Promise<TransactionEvent[]>;
+  fetchTransactionById: (id: string) => Promise<Transaction>;
   integrations: IntegrationsState;
   setYape: (v: boolean) => void;
   setIzipay: (v: boolean) => void;
@@ -263,6 +264,10 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
       return remote.map(fromRemote);
     },
     fetchTransactionEvents: (id) => api.get<TransactionEvent[]>(`/transactions/${id}/events`),
+    // GET /transactions only returns already-assigned payments, so anything
+    // still sitting in GENERAL is never in the shared `transactions` list —
+    // the detail screen needs this as a fallback for that case.
+    fetchTransactionById: async (id) => fromRemote(await api.get<RemoteTransaction>(`/transactions/${id}`)),
     integrations,
     setYape: (v) => setIntegrations(prev => ({ ...prev, yape: v })),
     setIzipay: (v) => setIntegrations(prev => ({ ...prev, izipay: v })),
@@ -285,11 +290,11 @@ function usePaymentsContext(): PaymentsCtxValue {
 export function useTransactions() {
   const {
     transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
-    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents,
+    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
   } = usePaymentsContext();
   return {
     transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
-    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents,
+    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
   };
 }
 

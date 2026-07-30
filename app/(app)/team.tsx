@@ -288,7 +288,7 @@ export default function TeamScreen() {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
-          {user?.role === 'owner' && (
+          {(user?.role === 'owner' || user?.role === 'supervisor') && (
             <TouchableOpacity onPress={() => setAddModal(true)}
               style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
               <Ionicons name="person-add-outline" size={18} color="#fff" />
@@ -431,13 +431,16 @@ export default function TeamScreen() {
         )}
       </Modal>
 
-      {/* Add member */}
+      {/* Add member — owner can create any role; a supervisor can only ever
+          create a cajero, so the role picker is hidden and stays on the
+          'cajero' default (mirrors the backend's POST / restriction). */}
       <MemberFormSheet
         visible={addModal}
         onClose={() => setAddModal(false)}
         initial={null}
         storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
         title={t.team.addMemberTitle}
+        canEditRole={user?.role === 'owner'}
         onSubmit={(data) => addMember({ ...data, password: data.password ?? '', active: true })}
       />
 

@@ -36,9 +36,29 @@ router.get('/', async (req, res) => {
   res.json(users.map(toPublicUser));
 });
 
-router.post('/', requireOwner, async (req, res) => {
+// Creating a member is owner+supervisor now (cajero still can't) — but a
+// supervisor may only ever create a cajero, never another supervisor or an
+// owner, for the same privilege-escalation reason role changes are
+// restricted in PUT /:id.
+router.post('/', async (req, res) => {
+  const auth = req.auth!;
   const { name, email: rawEmail, password, role, storeId } = req.body ?? {};
   if (!name || !rawEmail || !password || !role) return res.status(400).json({ error: 'Faltan campos requeridos' });
+
+  if (auth.role === 'cajero' || (auth.role === 'supervisor' && role !== 'cajero')) {
+    await logBlockedIntent({
+      businessId: auth.businessId,
+      userId: auth.userId,
+      actorEmail: auth.email,
+      eventType: 'BLOCKED_ROLE_ACTION',
+      severity: 'high',
+      detail: { actionAttempted: 'CREATE_TEAM_MEMBER', attemptedRole: role },
+      ipAddress: requestIp(req),
+      userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+    });
+    return res.status(403).json({ error: 'No tienes permiso para crear este tipo de miembro.' });
+  }
+
   const email = normalizeEmail(rawEmail);
 
   const existing = await prisma.user.findUnique({ where: { email } });

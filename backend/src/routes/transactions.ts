@@ -148,6 +148,32 @@ router.get('/general', async (req, res) => {
   res.json(transactions.map(toPublic));
 });
 
+// Whether `auth` may view `txn` at all — matches the union of what GET / and
+// GET /general already expose, so anything reachable from either list is
+// also individually fetchable by its own id. Without this, opening the
+// detail screen for a payment still sitting in GENERAL (storeId: null)
+// would 404, since GET / explicitly excludes unassigned payments — the
+// detail screen needs its own broader check, not the list's narrower one.
+function canViewTransaction(
+  auth: { role: 'owner' | 'supervisor' | 'cajero'; storeId: string | null },
+  txn: { storeId: string | null; timestamp: Date }
+): boolean {
+  if (auth.role === 'owner') return true;
+  const withinWindow = auth.role === 'cajero' ? isTimestampInLimaToday(txn.timestamp) : txn.timestamp >= limaWindowStart(90);
+  if (!withinWindow) return false;
+  if (txn.storeId === null) return true; // GENERAL is visible to everyone within their window
+  return auth.storeId === null || auth.storeId === txn.storeId;
+}
+
+// GET /transactions/:id — single-payment fetch, used by the mobile detail
+// screen. Broader visibility than GET / on purpose (see canViewTransaction).
+router.get('/:id', async (req, res) => {
+  const auth = req.auth!;
+  const txn = await prisma.transaction.findFirst({ where: { id: req.params.id, businessId: auth.businessId } });
+  if (!txn || !canViewTransaction(auth, txn)) return res.status(404).json({ error: 'Pago no encontrado' });
+  res.json(toPublic(txn));
+});
+
 // POST /transactions — automatic notification capture (Yape/Plin/Izipay),
 // called by the mobile app's listener for every payment it reads off the
 // device. Under the GENERAL-pool model this ALWAYS lands unassigned

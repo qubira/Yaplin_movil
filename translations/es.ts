@@ -222,6 +222,8 @@ const es = {
     notificationAccountLabel: 'Cuenta de notificaciones',
     assignedTeamLabel: 'Equipo asignado',
     paymentMethodsLabel: 'Métodos de pago',
+    historyLabel: 'Historial de pagos',
+    noHistory: 'Sin pagos para mostrar en tu rango de fechas permitido.',
     addStoreTitle: 'Agregar tienda',
     editStoreTitle: 'Editar tienda',
     deleteAlert: {

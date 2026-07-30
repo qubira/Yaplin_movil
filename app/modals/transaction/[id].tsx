@@ -282,10 +282,29 @@ export default function TransactionDetailScreen() {
   const t = useTranslation();
   const MES_ABR = t.common.months.abbr;
   const MES_FULL = t.common.months.full;
-  const { transactions, fetchTransactionEvents, routeTransaction, correctAmount, voidTransaction, reverseVoid, refreshTransactions } = useTransactions();
+  const { transactions, fetchTransactionEvents, fetchTransactionById, routeTransaction, correctAmount, voidTransaction, reverseVoid, refreshTransactions } = useTransactions();
   const { stores } = useStores();
   const { user } = useAuth();
-  const transaction = transactions.find(t => t.id === id);
+
+  // GET /transactions (the shared list this screen normally reads from)
+  // only ever contains already-assigned payments — anything still sitting
+  // in GENERAL is never in it, so opening its detail from the GENERAL
+  // screen would otherwise always show "not found". Fall back to fetching
+  // it directly by id whenever it's not in the already-loaded list.
+  const [fetchedTransaction, setFetchedTransaction] = useState<Transaction | null>(null);
+  const [fetchingTransaction, setFetchingTransaction] = useState(false);
+  const transaction = transactions.find(t => t.id === id) ?? fetchedTransaction ?? undefined;
+
+  useEffect(() => {
+    if (!id || transactions.some(t => t.id === id)) return;
+    let cancelled = false;
+    setFetchingTransaction(true);
+    fetchTransactionById(id)
+      .then((t) => { if (!cancelled) setFetchedTransaction(t); })
+      .catch(() => { if (!cancelled) setFetchedTransaction(null); })
+      .finally(() => { if (!cancelled) setFetchingTransaction(false); });
+    return () => { cancelled = true; };
+  }, [id, transactions, fetchTransactionById]);
 
   const [historyModal, setHistoryModal] = useState(false);
   const [filterKey, setFilterKey]       = useState<string>('all');
@@ -385,6 +404,16 @@ export default function TransactionDetailScreen() {
   }, [transaction, user, stores, t]);
   const canMove = moveOptions.length > 0 && !isVoided && !archived;
 
+  // refreshTransactions() only refetches the assigned-only shared list — a
+  // transaction here via the GENERAL fallback needs its own dedicated
+  // re-fetch too, or a version-conflict retry would keep using stale data.
+  async function refreshCurrentTransaction() {
+    await refreshTransactions().catch(() => {});
+    if (id && !transactions.some(t => t.id === id)) {
+      await fetchTransactionById(id).then(setFetchedTransaction).catch(() => {});
+    }
+  }
+
   function openActionModal(kind: 'move' | 'correct' | 'void' | 'reverseVoid') {
     setActionError('');
     setConfirmValue('');
@@ -404,7 +433,7 @@ export default function TransactionDetailScreen() {
       setActionModal(null);
       loadEvents();
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
       setActionError(apiErrorMessage(e, t));
     } finally {
       setActionSubmitting(false);
@@ -431,7 +460,7 @@ export default function TransactionDetailScreen() {
       setActionModal(null);
       loadEvents();
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
       if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
       setActionError(apiErrorMessage(e, t));
     } finally {
@@ -450,7 +479,7 @@ export default function TransactionDetailScreen() {
       setActionModal(null);
       loadEvents();
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
       if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
       setActionError(apiErrorMessage(e, t));
     } finally {
@@ -468,7 +497,7 @@ export default function TransactionDetailScreen() {
       setActionModal(null);
       loadEvents();
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
       setActionError(apiErrorMessage(e, t));
     } finally {
       setActionSubmitting(false);
@@ -479,10 +508,16 @@ export default function TransactionDetailScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <StatusBar style={c.isDark ? 'light' : 'dark'} />
-        <Ionicons name="receipt-outline" size={40} color={c.TEXT_SECONDARY} />
-        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 12, textAlign: 'center' }}>
-          {t.transaction.notFound}
-        </Text>
+        {fetchingTransaction ? (
+          <ActivityIndicator color={c.ACCENT_PURPLE} />
+        ) : (
+          <>
+            <Ionicons name="receipt-outline" size={40} color={c.TEXT_SECONDARY} />
+            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 12, textAlign: 'center' }}>
+              {t.transaction.notFound}
+            </Text>
+          </>
+        )}
         <TouchableOpacity onPress={() => router.back()}
           style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
           <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold' }}>{t.common.actions.back}</Text>
