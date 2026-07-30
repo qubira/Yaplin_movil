@@ -126,6 +126,16 @@ export function parseNotification(data: RawNotification): Transaction | null {
 
   return {
     id: `${data.packageName}-${timestamp.getTime()}-${Math.round(amount * 100)}`,
+    // Placeholder values for the fields the backend actually owns — this
+    // object only exists locally between capture and the POST /transactions
+    // response, which immediately overwrites it via fromRemote() in
+    // PaymentsStore. The payment is always unassigned (GENERAL) until
+    // routed, regardless of what this phone's account/store happens to be.
+    businessId: '',
+    storeId: null,
+    originalAmount: amount,
+    source: 'auto',
+    version: 0,
     payerName,
     payerInitials: initialsOf(payerName),
     amount,

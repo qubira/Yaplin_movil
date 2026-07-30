@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
 import { useTransactions, useIntegrations, usePreferences, PlinBank } from '../store/PaymentsStore';
-import { useDefaultStore } from '../store/StoresStore';
 import { useAuth } from '../store/AuthStore';
 import {
   parseNotification,
@@ -30,7 +29,6 @@ export function useNotificationCapture() {
   const { transactions, addTransaction, refreshTransactions } = useTransactions();
   const { integrations } = useIntegrations();
   const { preferences } = usePreferences();
-  const { defaultStoreId } = useDefaultStore();
   const { user } = useAuth();
 
   const userRef = useRef(user);
@@ -52,11 +50,6 @@ export function useNotificationCapture() {
   useEffect(() => {
     captureActiveRef.current = preferences.captureActive;
   }, [preferences.captureActive]);
-
-  const defaultStoreIdRef = useRef(defaultStoreId);
-  useEffect(() => {
-    defaultStoreIdRef.current = defaultStoreId;
-  }, [defaultStoreId]);
 
   // addTransaction is redefined every ~10s by the background transactions
   // poll in PaymentsStore (it's part of that store's single memoized value,
@@ -162,16 +155,15 @@ export function useNotificationCapture() {
     if (referencesRef.current.has(transaction.reference)) return;
     referencesRef.current.add(transaction.reference);
 
-    const storeId = defaultStoreIdRef.current;
-    if (!storeId) return;
-    transaction.storeId = storeId;
-
+    // No local default-store gate anymore: every capture reaches the
+    // backend regardless of whether this phone has a store concept at all
+    // — the backend decides GENERAL-vs-auto-assign on its own from the
+    // business's active stores, not from anything the client sends.
     if (voiceEnabledRef.current) announcePayment(transaction);
     if (pushEnabledRef.current) notifyPaymentReceived(transaction);
 
     addTransactionRef.current(transaction).catch(() => {
       enqueueOfflineTransaction({
-        storeId,
         payerName: transaction.payerName,
         payerInitials: transaction.payerInitials,
         amount: transaction.amount,

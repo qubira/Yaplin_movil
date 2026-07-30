@@ -1,6 +1,4 @@
-import { View, Text, SectionList, TouchableOpacity, Animated, Image } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, SectionList, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { PaymentColors } from '../../constants/colors';
@@ -25,9 +23,8 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(20);
   const t = useTranslation();
-  const { transactions: notifications, removeTransaction, markAllRead } = useTransactions();
+  const { transactions: notifications, markAllRead } = useTransactions();
 
-  const deleteNotification = (id: string) => removeTransaction(id);
   const now = new Date();
 
   const today     = notifications.filter(n => (now.getTime() - n.timestamp.getTime()) / 3600000 < 24);
@@ -40,48 +37,37 @@ export default function NotificationsScreen() {
     ...(thisWeek.length  ? [{ title: t.notifications.sections.thisWeek,  data: thisWeek }]  : []),
   ];
 
-  const renderRightActions = (id: string, _p: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-    const scale = dragX.interpolate({ inputRange: [-80, 0], outputRange: [1, 0.5], extrapolate: 'clamp' });
-    return (
-      <TouchableOpacity onPress={() => deleteNotification(id)}
-        style={{ backgroundColor: c.ACCENT_RED, justifyContent: 'center', alignItems: 'center', width: 72, marginVertical: 2, borderRadius: 16, marginLeft: 8 }}>
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons name="trash-outline" size={20} color="#fff" />
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
-
+  // No swipe-to-delete here anymore — removing a payment is now a
+  // deliberate "anular" action (owner only, reason + PIN/CONFIRMAR
+  // confirmation) from the transaction detail screen, not a quick gesture.
   const renderItem = ({ item }: { item: Transaction }) => (
-    <Swipeable renderRightActions={(p, d) => renderRightActions(item.id, p, d)} overshootRight={false}>
-      <View style={{
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: c.BACKGROUND_CARD, borderRadius: 18,
-        padding: 18, marginBottom: 10, borderWidth: 1,
-        borderColor: item.read ? c.BORDER : `${c.ACCENT_CYAN}33`,
-      }}>
-        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: `${PaymentColors[item.method]}22`, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-          <Image source={methodLogos[item.method] as any} style={{ width: 28, height: 28 }} resizeMode="contain" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: c.TEXT_PRIMARY, fontWeight: item.read ? '400' : '600', fontSize: 14, fontFamily: item.read ? 'Inter_400Regular' : 'Inter_600SemiBold' }}>
-            {item.payerName}
-          </Text>
-          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, marginTop: 2, fontFamily: 'Inter_400Regular' }}>
-            {t.notifications.paidVia(methodLabels[item.method])}
-          </Text>
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <Text style={{ color: c.SUCCESS, fontWeight: '700', fontSize: 15, fontFamily: 'Inter_700Bold' }}>
-            {formatAmount(item.amount)}
-          </Text>
-          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular' }}>
-            {formatTime(item.timestamp)}
-          </Text>
-          {!item.read && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.ACCENT_CYAN }} />}
-        </View>
+    <View style={{
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: c.BACKGROUND_CARD, borderRadius: 18,
+      padding: 18, marginBottom: 10, borderWidth: 1,
+      borderColor: item.read ? c.BORDER : `${c.ACCENT_CYAN}33`,
+    }}>
+      <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: `${PaymentColors[item.method]}22`, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+        <Image source={methodLogos[item.method] as any} style={{ width: 28, height: 28 }} resizeMode="contain" />
       </View>
-    </Swipeable>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.TEXT_PRIMARY, fontWeight: item.read ? '400' : '600', fontSize: 14, fontFamily: item.read ? 'Inter_400Regular' : 'Inter_600SemiBold' }}>
+          {item.payerName}
+        </Text>
+        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, marginTop: 2, fontFamily: 'Inter_400Regular' }}>
+          {t.notifications.paidVia(methodLabels[item.method])}
+        </Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <Text style={{ color: c.SUCCESS, fontWeight: '700', fontSize: 15, fontFamily: 'Inter_700Bold' }}>
+          {formatAmount(item.amount)}
+        </Text>
+        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular' }}>
+          {formatTime(item.timestamp)}
+        </Text>
+        {!item.read && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.ACCENT_CYAN }} />}
+      </View>
+    </View>
   );
 
   return (

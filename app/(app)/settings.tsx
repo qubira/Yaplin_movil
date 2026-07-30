@@ -7,10 +7,10 @@ import { StatusBar } from 'expo-status-bar';
 import { PaymentColors } from '../../constants/colors';
 import { useTheme } from '../../constants/theme';
 import { useIntegrations, usePreferences, PlinBank } from '../../store/PaymentsStore';
-import { useDefaultStore } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
 import { useLocale, useTranslation } from '../../store/LocaleStore';
 import { LOCALES, LOCALE_META } from '../../translations/locales';
+import { api, ApiError } from '../../services/api';
 import { isNotificationAccessGranted, openNotificationAccessSettings } from '../../services/androidNotificationAccess';
 import { isXiaomiDevice, openXiaomiAutostartSettings, requestIgnoreBatteryOptimizations } from '../../services/backgroundReliability';
 import { requestPushPermission } from '../../services/pushNotifications';
@@ -18,6 +18,7 @@ import { getAppVersionInfo } from '../../services/appVersion';
 import { useTopInset } from '../../hooks/useTopInset';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
+import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 
 const PLIN_BANKS: { key: PlinBank; label: string }[] = [
@@ -144,6 +145,99 @@ function SectionTitle({ title }: { title: string }) {
   );
 }
 
+// Set/change/remove the money-action confirmation PIN — PATCH /me/pin always
+// requires the current password too, since the PIN is what stands between
+// an unlocked phone and editing/voiding money.
+function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
+  visible: boolean;
+  mode: 'save' | 'remove';
+  hasExisting: boolean;
+  onClose: () => void;
+  onSaved: (hasTransactionPin: boolean) => void;
+}) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  const [password, setPassword] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setPassword('');
+    setNewPin('');
+    setError('');
+  }, [visible]);
+
+  async function handleSubmit() {
+    if (!password) { setError(t.settings.pinModal.missingPassword); return; }
+    if (mode === 'save' && !/^\d{4,8}$/.test(newPin)) { setError(t.settings.pinModal.invalidPin); return; }
+    setError('');
+    setSaving(true);
+    try {
+      const res = await api.patch<{ hasTransactionPin: boolean }>('/me/pin', {
+        password,
+        newPin: mode === 'remove' ? null : newPin,
+      });
+      onSaved(res.hasTransactionPin);
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 401 ? t.settings.pinModal.wrongPassword : t.settings.pinModal.genericError);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const title = mode === 'remove' ? t.settings.security.removePin : hasExisting ? t.settings.pinModal.titleChange : t.settings.pinModal.titleSet;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+          <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>{title}</Text>
+          {mode === 'save' && (
+            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+              {t.settings.pinModal.description}
+            </Text>
+          )}
+          <Input
+            label={t.settings.pinModal.passwordLabel}
+            placeholder={t.settings.pinModal.passwordPlaceholder}
+            value={password}
+            onChangeText={setPassword}
+            isPassword
+            leftIcon="lock-closed-outline"
+          />
+          {mode === 'save' && (
+            <Input
+              label={t.settings.pinModal.newPinLabel}
+              placeholder={t.settings.pinModal.newPinPlaceholder}
+              value={newPin}
+              onChangeText={(v) => setNewPin(v.replace(/[^0-9]/g, '').slice(0, 8))}
+              keyboardType="number-pad"
+              secureTextEntry
+              leftIcon="keypad-outline"
+            />
+          )}
+          {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
+          <TouchableOpacity onPress={handleSubmit} disabled={saving}
+            style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === 'remove' ? c.ACCENT_RED : c.ACCENT_PURPLE, opacity: saving ? 0.7 : 1 }}>
+            <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>
+              {saving ? t.common.actions.saving : mode === 'remove' ? t.settings.pinModal.removeButton : t.settings.pinModal.save}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose}
+            style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+            <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.pinModal.cancel}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function SettingsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -160,14 +254,12 @@ export default function SettingsScreen() {
     }
     setPushEnabled(v);
   }
-  const { defaultStoreId, setDefaultStoreId, stores } = useDefaultStore();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const versionInfo = getAppVersionInfo();
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [plinModal, setPlinModal] = useState(false);
-  const [storeModal, setStoreModal] = useState(false);
   const [languageModal, setLanguageModal] = useState(false);
-  const defaultStoreName = stores.find(s => s.id === defaultStoreId)?.name ?? t.settings.myBusiness.unassigned;
+  const [pinModalMode, setPinModalMode] = useState<'save' | 'remove' | null>(null);
 
   // When "Conectar" has to send the user to Android Settings first, we remember
   // what they were trying to turn on so it finishes automatically the moment
@@ -241,18 +333,34 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             )}
-            <TouchableOpacity onPress={() => setStoreModal(true)}
-              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.myBusiness.defaultStore}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{defaultStoreName}</Text>
-                <Ionicons name="chevron-forward" size={16} color={c.TEXT_SECONDARY} />
-              </View>
-            </TouchableOpacity>
           </View>
-          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 8, paddingHorizontal: 4 }}>
-            {t.settings.myBusiness.defaultStoreHint}
-          </Text>
+
+          {/* Seguridad */}
+          <SectionTitle title={t.settings.section.security} />
+          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+            <ActionRow
+              icon="keypad-outline"
+              label={user?.hasTransactionPin ? t.settings.security.pinRowLabelChange : t.settings.security.pinRowLabelSet}
+              buttonLabel={user?.hasTransactionPin ? t.settings.security.pinRowButtonChange : t.settings.security.pinRowButtonConfigure}
+              onPress={() => setPinModalMode('save')}
+            />
+            {user?.hasTransactionPin && (
+              <ActionRow
+                icon="close-circle-outline"
+                label={t.settings.security.removePin}
+                buttonLabel={t.settings.security.removePinButton}
+                onPress={() => setPinModalMode('remove')}
+              />
+            )}
+            {(user?.role === 'owner' || user?.role === 'supervisor') && (
+              <ActionRow
+                icon="alert-circle-outline"
+                label={t.settings.security.alertCenter}
+                buttonLabel={t.settings.security.openButton}
+                onPress={() => router.push('/(app)/alert-center')}
+              />
+            )}
+          </View>
 
           {/* Batería */}
           <SectionTitle title={t.settings.section.battery} />
@@ -398,36 +506,14 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
-      {/* Default store picker */}
-      <Modal visible={storeModal} transparent animationType="slide" onRequestClose={() => setStoreModal(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-              {t.settings.storeModal.title}
-            </Text>
-            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-              {t.settings.storeModal.description}
-            </Text>
-            <View style={{ gap: 8 }}>
-              {stores.map(store => {
-                const active = store.id === defaultStoreId;
-                return (
-                  <TouchableOpacity key={store.id} onPress={() => { setDefaultStoreId(store.id); setStoreModal(false); }}
-                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
-                    <Text style={{ flex: 1, color: active ? '#fff' : c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{store.name}</Text>
-                    {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <TouchableOpacity onPress={() => setStoreModal(false)}
-              style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.close}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* PIN de transacciones */}
+      <PinModal
+        visible={pinModalMode !== null}
+        mode={pinModalMode ?? 'save'}
+        hasExisting={!!user?.hasTransactionPin}
+        onClose={() => setPinModalMode(null)}
+        onSaved={() => { refreshUser().catch(() => {}); }}
+      />
 
       {/* Language picker */}
       <Modal visible={languageModal} transparent animationType="slide" onRequestClose={() => setLanguageModal(false)}>

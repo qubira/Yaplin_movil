@@ -2,22 +2,28 @@ export type PaymentMethod = 'yape' | 'plin' | 'izipay';
 
 export interface Transaction {
   id: string;
+  businessId: string;
   payerName: string;
   payerInitials: string;
+  originalAmount: number;
   amount: number;
   method: PaymentMethod;
   timestamp: Date;
   reference: string;
-  status: 'confirmed' | 'pending';
+  status: 'confirmed' | 'voided';
   read?: boolean;
-  storeId?: string;
+  storeId: string | null;
+  source: 'auto' | 'manual';
+  version: number;
 }
 
 const now = new Date();
 const h = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * 3600000);
 const d = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86400000);
 
-export const mockTransactions: Transaction[] = [
+type MockTxnSeed = Pick<Transaction, 'id' | 'payerName' | 'payerInitials' | 'amount' | 'method' | 'timestamp' | 'reference' | 'status'>;
+
+const mockSeeds: MockTxnSeed[] = [
   { id: 'txn-001', payerName: 'Carlos Mendoza', payerInitials: 'CM', amount: 150.0,  method: 'yape',   timestamp: h(0.3),  reference: 'YP-2024-001', status: 'confirmed' },
   { id: 'txn-002', payerName: 'María García',   payerInitials: 'MG', amount: 45.5,   method: 'plin',   timestamp: h(1),    reference: 'PL-2024-002', status: 'confirmed' },
   { id: 'txn-003', payerName: 'Juan Torres',    payerInitials: 'JT', amount: 320.0,  method: 'yape',   timestamp: h(2),    reference: 'YP-2024-003', status: 'confirmed' },
@@ -40,6 +46,18 @@ export const mockTransactions: Transaction[] = [
   { id: 'txn-017', payerName: 'Juan Torres',    payerInitials: 'JT', amount: 500.0,  method: 'izipay', timestamp: d(2),    reference: 'IZ-2024-017', status: 'confirmed' },
   { id: 'txn-018', payerName: 'Juan Torres',    payerInitials: 'JT', amount: 145.0,  method: 'yape',   timestamp: d(5),    reference: 'YP-2024-018', status: 'confirmed' },
 ];
+
+// mockSeeds carry only the fields that vary per sample payment; the rest of
+// the (now larger) Transaction shape is filled in with the same
+// unassigned/auto-captured defaults for every mock row.
+export const mockTransactions: Transaction[] = mockSeeds.map((seed) => ({
+  ...seed,
+  businessId: 'mock-business',
+  originalAmount: seed.amount,
+  storeId: null,
+  source: 'auto',
+  version: 0,
+}));
 
 export function formatAmount(amount: number): string {
   return `S/ ${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;

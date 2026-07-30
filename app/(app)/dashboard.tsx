@@ -16,6 +16,7 @@ import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
 import TransactionItem from '../../components/ui/TransactionItem';
 import Avatar from '../../components/ui/Avatar';
+import Badge from '../../components/ui/Badge';
 import BrandLoader from '../../components/ui/BrandLoader';
 
 type Period = 'Hoy' | 'Día' | 'Semana' | 'Mes';
@@ -76,7 +77,10 @@ function labelPeriodo(p: Period, sel: Sel, hoy: Date, abr: string[], full: strin
 
 function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }) {
   const { c } = useTheme();
+  const t = useTranslation();
   const color = PaymentColors[txn.method];
+  const isVoided = txn.status === 'voided';
+  const isEdited = txn.amount !== txn.originalAmount;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
       style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }}>
@@ -95,12 +99,19 @@ function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }
         </View>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <Text style={{ color: c.SUCCESS, fontSize: 15, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>
+        <Text style={{
+          color: isVoided ? c.TEXT_SECONDARY : c.SUCCESS, fontSize: 15, fontWeight: '700', fontFamily: 'Inter_700Bold',
+          textDecorationLine: isVoided ? 'line-through' : 'none',
+        }}>
           {formatAmount(txn.amount)}
         </Text>
         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 10, fontFamily: 'Inter_400Regular' }}>
           {formatDate(txn.timestamp)}  {formatTime(txn.timestamp)}
         </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {isEdited && <Ionicons name="pencil" size={10} color={c.WARNING} />}
+          {isVoided && <Badge label={t.transaction.voided} variant="error" size="sm" />}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -124,7 +135,7 @@ export default function DashboardScreen() {
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
   const [pickerVisible, setPickerVisible] = useState(false);
   const [verTodos, setVerTodos]       = useState(false);
-  const { transactions: allTxns, transactionsLoading, removeTransaction } = useTransactions();
+  const { transactions: allTxns, transactionsLoading } = useTransactions();
 
   const [navY, setNavY]     = useState(hoy.getFullYear());
   const [navM, setNavM]     = useState(hoy.getMonth());
@@ -289,7 +300,6 @@ export default function DashboardScreen() {
               <TransactionItem
                 key={txn.id}
                 transaction={txn}
-                onDelete={() => removeTransaction(txn.id)}
               />
             ))
           )}

@@ -35,30 +35,77 @@ const DEFAULT_PREFERENCES: PreferencesState = {
 
 interface RemoteTransaction {
   id: string;
-  storeId: string;
+  businessId: string;
+  storeId: string | null;
   payerName: string;
   payerInitials: string;
+  originalAmount: number;
   amount: number;
   method: string;
   timestamp: string;
   reference: string;
   status: string;
   read: boolean;
+  source: string;
+  version: number;
+  createdAt?: string;
 }
 
 function fromRemote(t: RemoteTransaction): Transaction {
   return {
     id: t.id,
+    businessId: t.businessId,
     storeId: t.storeId,
     payerName: t.payerName,
     payerInitials: t.payerInitials,
+    originalAmount: t.originalAmount,
     amount: t.amount,
     method: t.method as Transaction['method'],
     timestamp: new Date(t.timestamp),
     reference: t.reference,
     status: t.status as Transaction['status'],
     read: t.read,
+    source: t.source as Transaction['source'],
+    version: t.version,
   };
+}
+
+// GET /transactions/:id/events — full immutable timeline entry. `payload`'s
+// exact shape depends on `type` (see backend transactions.ts), so callers
+// narrow it themselves based on `type` when rendering.
+export interface TransactionEvent {
+  id: string;
+  type:
+    | 'CAPTURED'
+    | 'MANUAL_CREATED'
+    | 'ASSIGNED'
+    | 'RETURNED_TO_GENERAL'
+    | 'AMOUNT_CORRECTED'
+    | 'VOIDED'
+    | 'VOID_REVERSED'
+    | 'NOTE_ADDED';
+  payload: Record<string, unknown>;
+  actorName: string;
+  actorRole: string;
+  createdAt: string;
+}
+
+// Shared double-confirmation gate for money-affecting actions: exactly one
+// of these two should be sent, matching whichever method the backend
+// expects for this user (PIN if they configured one, else the "CONFIRMAR"
+// text gate) — see verifyConfirmation() in backend/src/routes/transactions.ts.
+export interface ConfirmationInput {
+  confirmPin?: string;
+  confirmText?: string;
+}
+
+export interface ManualTransactionInput {
+  storeId: string;
+  amount: number;
+  payerName?: string;
+  notes?: string;
+  method?: string;
+  timestamp?: string;
 }
 
 interface PaymentsCtxValue {
@@ -67,8 +114,14 @@ interface PaymentsCtxValue {
   transactionsLoading: boolean;
   refreshTransactions: () => Promise<void>;
   addTransaction: (t: Transaction) => Promise<void>;
-  removeTransaction: (id: string) => void;
   markAllRead: () => void;
+  routeTransaction: (id: string, toStoreId: string | null, version: number) => Promise<Transaction>;
+  correctAmount: (id: string, delta: number, reason: string, version: number, confirm: ConfirmationInput) => Promise<Transaction>;
+  voidTransaction: (id: string, reason: string, version: number, confirm: ConfirmationInput) => Promise<Transaction>;
+  reverseVoid: (id: string, reason: string, version: number) => Promise<Transaction>;
+  createManualTransaction: (input: ManualTransactionInput) => Promise<Transaction>;
+  fetchGeneralPool: () => Promise<Transaction[]>;
+  fetchTransactionEvents: (id: string) => Promise<TransactionEvent[]>;
   integrations: IntegrationsState;
   setYape: (v: boolean) => void;
   setIzipay: (v: boolean) => void;
@@ -157,8 +210,10 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
       setTransactions(prev => (
         prev.some(x => x.id === t.id) ? prev : [t, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       ));
+      // storeId is deliberately NOT sent — under the GENERAL-pool model the
+      // backend always decides unassigned-vs-auto-assign on its own, and any
+      // storeId here would be silently ignored server-side anyway.
       const saved = await api.post<RemoteTransaction>('/transactions', {
-        storeId: t.storeId,
         payerName: t.payerName,
         payerInitials: t.payerInitials,
         amount: t.amount,
@@ -169,14 +224,45 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
       });
       setTransactions(prev => prev.map(x => (x.id === t.id ? fromRemote(saved) : x)));
     },
-    removeTransaction: (id) => {
-      setTransactions(prev => prev.filter(t => t.id !== id));
-      api.delete(`/transactions/${id}`).catch(() => {});
-    },
     markAllRead: () => {
       setTransactions(prev => prev.map(t => (t.read ? t : { ...t, read: true })));
       api.post('/transactions/mark-all-read').catch(() => {});
     },
+    routeTransaction: async (id, toStoreId, version) => {
+      const saved = await api.post<RemoteTransaction>(`/transactions/${id}/route`, { toStoreId, version });
+      const updated = fromRemote(saved);
+      setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
+      return updated;
+    },
+    correctAmount: async (id, delta, reason, version, confirm) => {
+      const saved = await api.patch<RemoteTransaction>(`/transactions/${id}/correct-amount`, { delta, reason, version, ...confirm });
+      const updated = fromRemote(saved);
+      setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
+      return updated;
+    },
+    voidTransaction: async (id, reason, version, confirm) => {
+      const saved = await api.post<RemoteTransaction>(`/transactions/${id}/void`, { reason, version, ...confirm });
+      const updated = fromRemote(saved);
+      setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
+      return updated;
+    },
+    reverseVoid: async (id, reason, version) => {
+      const saved = await api.post<RemoteTransaction>(`/transactions/${id}/void-reverse`, { reason, version });
+      const updated = fromRemote(saved);
+      setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
+      return updated;
+    },
+    createManualTransaction: async (input) => {
+      const saved = await api.post<RemoteTransaction>('/transactions/manual', input);
+      const created = fromRemote(saved);
+      setTransactions(prev => [created, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
+      return created;
+    },
+    fetchGeneralPool: async () => {
+      const remote = await api.get<RemoteTransaction[]>('/transactions/general');
+      return remote.map(fromRemote);
+    },
+    fetchTransactionEvents: (id) => api.get<TransactionEvent[]>(`/transactions/${id}/events`),
     integrations,
     setYape: (v) => setIntegrations(prev => ({ ...prev, yape: v })),
     setIzipay: (v) => setIntegrations(prev => ({ ...prev, izipay: v })),
@@ -197,8 +283,14 @@ function usePaymentsContext(): PaymentsCtxValue {
 }
 
 export function useTransactions() {
-  const { transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, removeTransaction, markAllRead } = usePaymentsContext();
-  return { transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, removeTransaction, markAllRead };
+  const {
+    transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
+    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents,
+  } = usePaymentsContext();
+  return {
+    transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
+    routeTransaction, correctAmount, voidTransaction, reverseVoid, createManualTransaction, fetchGeneralPool, fetchTransactionEvents,
+  };
 }
 
 export function useIntegrations() {

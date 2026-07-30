@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback, ReactNode } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Share, Image,
-  Modal, LayoutAnimation, Platform, UIManager, Linking,
+  Modal, LayoutAnimation, Platform, UIManager, Linking, ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,13 +11,75 @@ import { StatusBar } from 'expo-status-bar';
 import { PaymentColors } from '../../../constants/colors';
 import { useTheme } from '../../../constants/theme';
 import { formatAmount, formatDate, formatTime, Transaction } from '../../../mocks/transactions';
-import { useTransactions } from '../../../store/PaymentsStore';
+import { useTransactions, TransactionEvent, ConfirmationInput } from '../../../store/PaymentsStore';
 import { useStores } from '../../../store/StoresStore';
+import { Store } from '../../../mocks/stores';
 import { useAuth } from '../../../store/AuthStore';
 import { useTranslation } from '../../../store/LocaleStore';
+import { ApiError } from '../../../services/api';
+import { dictionaries } from '../../../translations';
 import Avatar from '../../../components/ui/Avatar';
+import Input from '../../../components/ui/Input';
 
 const SUPPORT_EMAIL = 'qubirasac@gmail.com';
+
+function isArchivedClient(timestamp: Date): boolean {
+  return timestamp.getFullYear() < new Date().getFullYear();
+}
+
+function isTodayClient(timestamp: Date): boolean {
+  const now = new Date();
+  return timestamp.getFullYear() === now.getFullYear() && timestamp.getMonth() === now.getMonth() && timestamp.getDate() === now.getDate();
+}
+
+// Client-side mirror of canRoute() in backend/src/routes/transactions.ts —
+// used only to decide which UI to show; the backend re-checks everything
+// itself and is the real authority. Returns the list of valid destinations
+// (a real store, or `null` for "back to GENERAL") for the given user/payment.
+function routeOptions(
+  role: 'owner' | 'supervisor' | 'cajero',
+  userStoreId: string | null,
+  txn: Transaction,
+  stores: Store[]
+): { id: string | null; name: string }[] {
+  const generalOption = { id: null, name: '' }; // name filled in by caller via translation
+  if (role === 'owner') {
+    return [generalOption, ...stores.filter(s => s.id !== txn.storeId).map(s => ({ id: s.id, name: s.name }))];
+  }
+  if (!isTodayClient(txn.timestamp)) return [];
+  if (role === 'cajero') {
+    if (txn.storeId !== null || !userStoreId) return [];
+    const mine = stores.find(s => s.id === userStoreId);
+    return mine ? [{ id: mine.id, name: mine.name }] : [];
+  }
+  // supervisor
+  if (userStoreId === null) {
+    // storeId === null means this supervisor oversees ALL stores (same
+    // convention as team.tsx's "all stores" assignment) — matches the
+    // backend's `auth.storeId === null` branch, which allows any move,
+    // same freedom as owner, still gated on sameDay above.
+    return [generalOption, ...stores.filter(s => s.id !== txn.storeId).map(s => ({ id: s.id, name: s.name }))];
+  }
+  const mine = stores.find(s => s.id === userStoreId);
+  const mineOption = mine && mine.id !== txn.storeId ? [{ id: mine.id, name: mine.name }] : [];
+  if (txn.storeId === userStoreId) {
+    // from their own store: any destination is allowed
+    return [generalOption, ...stores.filter(s => s.id !== txn.storeId).map(s => ({ id: s.id, name: s.name }))];
+  }
+  return mineOption;
+}
+
+function apiErrorMessage(e: unknown, t: typeof dictionaries['es']): string {
+  if (e instanceof ApiError) {
+    if (e.code === 'VOIDED') return t.transaction.errors.voided;
+    if (e.code === 'ARCHIVED') return t.transaction.errors.archived;
+    if (e.code === 'VERSION_CONFLICT') return t.transaction.errors.versionConflict;
+    if (e.code === 'CONFIRMATION_REQUIRED') return t.transaction.errors.confirmationRequired;
+    if (e.code === 'CONFIRMATION_INVALID') return t.transaction.errors.confirmationInvalid;
+    if (e.status === 403) return t.transaction.errors.forbidden;
+  }
+  return t.transaction.errors.generic;
+}
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 
@@ -81,6 +143,138 @@ function ModalTxnRow({ txn, noBorder }: { txn: Transaction; noBorder?: boolean }
   );
 }
 
+// Shared double-confirmation input: a PIN keypad if the owner configured
+// one, otherwise a plain "type CONFIRMAR" text field — mirrors
+// verifyConfirmation() in backend/src/routes/transactions.ts exactly, so the
+// UI asks for whichever the backend will actually check.
+function ConfirmField({ hasPin, value, onChangeText }: { hasPin: boolean; value: string; onChangeText: (v: string) => void }) {
+  const t = useTranslation();
+  return hasPin ? (
+    <Input
+      label={t.transaction.confirmStep.pinTitle}
+      placeholder={t.transaction.confirmStep.pinPlaceholder}
+      value={value}
+      onChangeText={(v) => onChangeText(v.replace(/[^0-9]/g, '').slice(0, 8))}
+      keyboardType="number-pad"
+      secureTextEntry
+      leftIcon="keypad-outline"
+    />
+  ) : (
+    <Input
+      label={t.transaction.confirmStep.textDescription(t.transaction.confirmStep.textPlaceholder)}
+      placeholder={t.transaction.confirmStep.textPlaceholder}
+      value={value}
+      onChangeText={onChangeText}
+      autoCapitalize="characters"
+      leftIcon="checkmark-done-outline"
+    />
+  );
+}
+
+function TimelineRow({ event, isLast }: { event: TransactionEvent; isLast: boolean }) {
+  const { c } = useTheme();
+  const t = useTranslation();
+  const { stores } = useStores();
+
+  const iconByType: Record<TransactionEvent['type'], keyof typeof Ionicons.glyphMap> = {
+    CAPTURED: 'download-outline',
+    MANUAL_CREATED: 'create-outline',
+    ASSIGNED: 'arrow-redo-outline',
+    RETURNED_TO_GENERAL: 'arrow-undo-outline',
+    AMOUNT_CORRECTED: 'pencil-outline',
+    VOIDED: 'ban-outline',
+    VOID_REVERSED: 'refresh-outline',
+    NOTE_ADDED: 'chatbox-ellipses-outline',
+  };
+
+  const actorLabel = event.actorRole === 'system'
+    ? t.transaction.systemActor
+    : `${event.actorName} (${event.actorRole === 'owner' ? t.common.roles.owner : event.actorRole === 'supervisor' ? t.common.roles.supervisor : t.common.roles.cajero})`;
+
+  function storeName(storeId: unknown): string {
+    if (storeId === null || storeId === undefined) return t.common.generalPoolLabel;
+    return stores.find(s => s.id === storeId)?.name ?? t.common.generalPoolLabel;
+  }
+
+  let detail: string | null = null;
+  if (event.type === 'ASSIGNED') {
+    detail = t.transaction.eventDetail.toStore(storeName(event.payload.toStoreId));
+  } else if (event.type === 'RETURNED_TO_GENERAL') {
+    detail = t.transaction.eventDetail.toGeneral;
+  } else if (event.type === 'AMOUNT_CORRECTED') {
+    const prev = Number(event.payload.previousAmount);
+    const next = Number(event.payload.newAmount);
+    const delta = Number(event.payload.delta);
+    detail = t.transaction.eventDetail.amountChange(formatAmount(prev), formatAmount(next), `${delta >= 0 ? '+' : ''}${formatAmount(delta)}`);
+  } else if ((event.type === 'VOIDED' || event.type === 'VOID_REVERSED') && typeof event.payload.reason === 'string') {
+    detail = t.transaction.eventDetail.reason(event.payload.reason);
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', paddingVertical: 12, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: c.BORDER }}>
+      <View style={{ width: 28, alignItems: 'center', marginRight: 10, paddingTop: 2 }}>
+        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: `${c.ACCENT_PURPLE}22`, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={iconByType[event.type]} size={13} color={c.ACCENT_PURPLE} />
+        </View>
+        {!isLast && <View style={{ flex: 1, width: 2, backgroundColor: c.BORDER, marginTop: 4 }} />}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.TEXT_PRIMARY, fontSize: 13, fontFamily: 'Inter_600SemiBold', fontWeight: '600' }}>
+          {actorLabel} {t.transaction.events[event.type]}
+        </Text>
+        {!!detail && (
+          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{detail}</Text>
+        )}
+        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 }}>
+          {formatDate(new Date(event.createdAt))} · {formatTime(new Date(event.createdAt))}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+interface ActionModalShellProps {
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+  onSubmit: () => void;
+  submitLabel: string;
+  submitting: boolean;
+  error: string;
+  submitColor?: string;
+  children: ReactNode;
+}
+
+function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, submitting, error, submitColor, children }: ActionModalShellProps) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%' }}>
+          <ScrollView keyboardShouldPersistTaps="handled">
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>{title}</Text>
+            {children}
+            {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
+            <TouchableOpacity onPress={onSubmit} disabled={submitting}
+              style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: submitColor ?? c.ACCENT_PURPLE, opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? <ActivityIndicator color="#fff" /> : (
+                <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{submitLabel}</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose} disabled={submitting}
+              style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function TransactionDetailScreen() {
   const { c, toggle } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -88,7 +282,7 @@ export default function TransactionDetailScreen() {
   const t = useTranslation();
   const MES_ABR = t.common.months.abbr;
   const MES_FULL = t.common.months.full;
-  const { transactions } = useTransactions();
+  const { transactions, fetchTransactionEvents, routeTransaction, correctAmount, voidTransaction, reverseVoid, refreshTransactions } = useTransactions();
   const { stores } = useStores();
   const { user } = useAuth();
   const transaction = transactions.find(t => t.id === id);
@@ -97,6 +291,38 @@ export default function TransactionDetailScreen() {
   const [filterKey, setFilterKey]       = useState<string>('all');
   const [collapsed, setCollapsed]       = useState<Set<string>>(new Set());
   const [supportModal, setSupportModal] = useState(false);
+
+  // ── Timeline ──
+  const [events, setEvents] = useState<TransactionEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState(false);
+
+  const loadEvents = useCallback(async () => {
+    if (!id) return;
+    setEventsLoading(true);
+    setEventsError(false);
+    try {
+      const remote = await fetchTransactionEvents(id);
+      setEvents(remote);
+    } catch {
+      setEventsError(true);
+    } finally {
+      setEventsLoading(false);
+    }
+  }, [id, fetchTransactionEvents]);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  // ── Owner/routing actions ──
+  const [actionModal, setActionModal] = useState<'move' | 'correct' | 'void' | 'reverseVoid' | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<{ id: string | null; name: string } | null>(null);
+  const [newAmountText, setNewAmountText] = useState('');
+  const [correctReason, setCorrectReason] = useState('');
+  const [voidReason, setVoidReason] = useState('');
+  const [reverseReason, setReverseReason] = useState('');
+  const [confirmValue, setConfirmValue] = useState('');
 
   const history = useMemo(() =>
     transaction
@@ -142,6 +368,112 @@ export default function TransactionDetailScreen() {
     });
     return out;
   }, [filterKey, monthGroups]);
+
+  const isOwner = user?.role === 'owner';
+  const isVoided = transaction?.status === 'voided';
+  const isEdited = !!transaction && transaction.amount !== transaction.originalAmount;
+  const archived = transaction ? isArchivedClient(transaction.timestamp) : false;
+  const canCorrect = isOwner && !!transaction && !archived && !isVoided;
+  const canVoid = isOwner && !!transaction && !archived && !isVoided;
+  const canReverseVoid = isOwner && !!transaction && !archived && !!isVoided;
+
+  const moveOptions = useMemo(() => {
+    if (!transaction || !user) return [];
+    return routeOptions(user.role, user.storeId, transaction, stores).map(o =>
+      o.id === null ? { id: null, name: t.common.generalPoolLabel } : o
+    );
+  }, [transaction, user, stores, t]);
+  const canMove = moveOptions.length > 0 && !isVoided && !archived;
+
+  function openActionModal(kind: 'move' | 'correct' | 'void' | 'reverseVoid') {
+    setActionError('');
+    setConfirmValue('');
+    if (kind === 'correct' && transaction) { setNewAmountText(String(transaction.amount)); setCorrectReason(''); }
+    if (kind === 'void') setVoidReason('');
+    if (kind === 'reverseVoid') setReverseReason('');
+    if (kind === 'move') setMoveTarget(null);
+    setActionModal(kind);
+  }
+
+  async function submitMove() {
+    if (!transaction || !moveTarget) return;
+    setActionSubmitting(true);
+    setActionError('');
+    try {
+      await routeTransaction(transaction.id, moveTarget.id, transaction.version);
+      setActionModal(null);
+      loadEvents();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      setActionError(apiErrorMessage(e, t));
+    } finally {
+      setActionSubmitting(false);
+    }
+  }
+
+  async function submitCorrect() {
+    if (!transaction) return;
+    const newAmount = parseFloat(newAmountText.replace(',', '.'));
+    if (!Number.isFinite(newAmount) || newAmount === transaction.amount) {
+      setActionError(t.transaction.correctModal.invalidAmount);
+      return;
+    }
+    if (!correctReason.trim()) {
+      setActionError(t.transaction.correctModal.reasonRequired);
+      return;
+    }
+    const delta = Math.round((newAmount - transaction.amount) * 100) / 100;
+    const confirm: ConfirmationInput = user?.hasTransactionPin ? { confirmPin: confirmValue } : { confirmText: confirmValue };
+    setActionSubmitting(true);
+    setActionError('');
+    try {
+      await correctAmount(transaction.id, delta, correctReason.trim(), transaction.version, confirm);
+      setActionModal(null);
+      loadEvents();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
+      setActionError(apiErrorMessage(e, t));
+    } finally {
+      setActionSubmitting(false);
+    }
+  }
+
+  async function submitVoid() {
+    if (!transaction) return;
+    if (!voidReason.trim()) { setActionError(t.transaction.voidModal.reasonRequired); return; }
+    const confirm: ConfirmationInput = user?.hasTransactionPin ? { confirmPin: confirmValue } : { confirmText: confirmValue };
+    setActionSubmitting(true);
+    setActionError('');
+    try {
+      await voidTransaction(transaction.id, voidReason.trim(), transaction.version, confirm);
+      setActionModal(null);
+      loadEvents();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
+      setActionError(apiErrorMessage(e, t));
+    } finally {
+      setActionSubmitting(false);
+    }
+  }
+
+  async function submitReverseVoid() {
+    if (!transaction) return;
+    if (!reverseReason.trim()) { setActionError(t.transaction.reverseVoidModal.reasonRequired); return; }
+    setActionSubmitting(true);
+    setActionError('');
+    try {
+      await reverseVoid(transaction.id, reverseReason.trim(), transaction.version);
+      setActionModal(null);
+      loadEvents();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshTransactions().catch(() => {});
+      setActionError(apiErrorMessage(e, t));
+    } finally {
+      setActionSubmitting(false);
+    }
+  }
 
   if (!transaction) {
     return (
@@ -219,12 +551,30 @@ export default function TransactionDetailScreen() {
           <View style={{ width: 96, height: 96, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: `${brand.color}55`, marginBottom: 20, shadowColor: brand.color, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 12 }}>
             <Image source={brand.logo} style={{ width: 60, height: 60 }} resizeMode="contain" />
           </View>
-          <Text style={{ color: '#fff', fontSize: 46, fontWeight: '800', fontFamily: 'Inter_800ExtraBold', letterSpacing: -1.5, marginBottom: 12 }}>
+          <Text style={{
+            color: '#fff', fontSize: 46, fontWeight: '800', fontFamily: 'Inter_800ExtraBold', letterSpacing: -1.5, marginBottom: isEdited ? 4 : 12,
+            textDecorationLine: isVoided ? 'line-through' : 'none',
+          }}>
             {formatAmount(transaction.amount)}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${c.SUCCESS}22`, borderWidth: 1, borderColor: `${c.SUCCESS}55`, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, marginBottom: 24 }}>
-            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.SUCCESS }} />
-            <Text style={{ color: c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.confirmed}</Text>
+          {isEdited && (
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 12 }}>
+              {t.transaction.editedOriginalAmount(formatAmount(transaction.originalAmount))}
+            </Text>
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isVoided ? `${c.ACCENT_RED}22` : `${c.SUCCESS}22`, borderWidth: 1, borderColor: isVoided ? `${c.ACCENT_RED}55` : `${c.SUCCESS}55`, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: isVoided ? c.ACCENT_RED : c.SUCCESS }} />
+              <Text style={{ color: isVoided ? c.ACCENT_RED : c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                {isVoided ? t.transaction.voided : t.transaction.confirmed}
+              </Text>
+            </View>
+            {isEdited && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: `${c.WARNING}22`, borderWidth: 1, borderColor: `${c.WARNING}55`, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                <Ionicons name="pencil" size={11} color={c.WARNING} />
+                <Text style={{ color: c.WARNING, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.edited}</Text>
+              </View>
+            )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, alignSelf: 'stretch' }}>
             <Avatar initials={transaction.payerInitials} size="sm" color={brand.color} />
@@ -245,13 +595,77 @@ export default function TransactionDetailScreen() {
             <DetailRow label={t.transaction.detail.time}      value={formatTime(transaction.timestamp)} />
             <DetailRow label={t.transaction.detail.reference} value={transaction.reference} valueColor={c.ACCENT_CYAN} />
             <DetailRow label={t.transaction.detail.method}    value={brand.label} valueColor={brand.color} />
+            {isEdited && (
+              <DetailRow label={t.transaction.correctModal.currentAmountLabel} value={t.transaction.editedOriginalAmount(formatAmount(transaction.originalAmount))} valueColor={c.WARNING} />
+            )}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15 }}>
               <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.transaction.detail.status}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: `${c.SUCCESS}18`, borderWidth: 1, borderColor: `${c.SUCCESS}44`, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.SUCCESS }} />
-                <Text style={{ color: c.SUCCESS, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.confirmed}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: isVoided ? `${c.ACCENT_RED}18` : `${c.SUCCESS}18`, borderWidth: 1, borderColor: isVoided ? `${c.ACCENT_RED}44` : `${c.SUCCESS}44`, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isVoided ? c.ACCENT_RED : c.SUCCESS }} />
+                <Text style={{ color: isVoided ? c.ACCENT_RED : c.SUCCESS, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                  {isVoided ? t.transaction.voided : t.transaction.confirmed}
+                </Text>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* Acciones — mover / corregir / anular (gated client-side, backend re-checks everything) */}
+        {(canMove || canCorrect || canVoid || canReverseVoid) && (
+          <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {canMove && (
+                <TouchableOpacity onPress={() => openActionModal('move')} activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.ACCENT_CYAN}18`, borderWidth: 1, borderColor: `${c.ACCENT_CYAN}44` }}>
+                  <Ionicons name="swap-horizontal-outline" size={16} color={c.ACCENT_CYAN} />
+                  <Text style={{ color: c.ACCENT_CYAN, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.move}</Text>
+                </TouchableOpacity>
+              )}
+              {canCorrect && (
+                <TouchableOpacity onPress={() => openActionModal('correct')} activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.ACCENT_PURPLE}18`, borderWidth: 1, borderColor: `${c.ACCENT_PURPLE}44` }}>
+                  <Ionicons name="pencil-outline" size={16} color={c.ACCENT_PURPLE} />
+                  <Text style={{ color: c.ACCENT_PURPLE, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.correctAmount}</Text>
+                </TouchableOpacity>
+              )}
+              {canVoid && (
+                <TouchableOpacity onPress={() => openActionModal('void')} activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.ACCENT_RED}18`, borderWidth: 1, borderColor: `${c.ACCENT_RED}44` }}>
+                  <Ionicons name="ban-outline" size={16} color={c.ACCENT_RED} />
+                  <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.void}</Text>
+                </TouchableOpacity>
+              )}
+              {canReverseVoid && (
+                <TouchableOpacity onPress={() => openActionModal('reverseVoid')} activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.SUCCESS}18`, borderWidth: 1, borderColor: `${c.SUCCESS}44` }}>
+                  <Ionicons name="refresh-outline" size={16} color={c.SUCCESS} />
+                  <Text style={{ color: c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.reverseVoid}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {archived && (
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 10 }}>{t.transaction.blockedArchived}</Text>
+            )}
+          </View>
+        )}
+
+        {/* Historial del pago (timeline) */}
+        <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+          <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>
+            {t.transaction.timelineTitle}
+          </Text>
+          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16, overflow: 'hidden' }}>
+            {eventsLoading ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <ActivityIndicator color={c.ACCENT_PURPLE} />
+              </View>
+            ) : eventsError ? (
+              <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', paddingVertical: 16 }}>{t.transaction.timelineLoadError}</Text>
+            ) : events.length === 0 ? (
+              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', paddingVertical: 16 }}>{t.transaction.timelineEmpty}</Text>
+            ) : (
+              events.map((event, i) => <TimelineRow key={event.id} event={event} isLast={i === events.length - 1} />)
+            )}
           </View>
         </View>
 
@@ -450,6 +864,102 @@ export default function TransactionDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ══ MOVER PAGO ══ */}
+      <ActionModalShell
+        visible={actionModal === 'move'}
+        title={t.transaction.moveModal.title}
+        onClose={() => setActionModal(null)}
+        onSubmit={submitMove}
+        submitLabel={t.transaction.moveModal.submit}
+        submitting={actionSubmitting}
+        error={actionError}
+      >
+        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+          {t.transaction.moveModal.description}
+        </Text>
+        <View style={{ gap: 8, marginBottom: 8 }}>
+          {moveOptions.map(option => {
+            const active = moveTarget?.id === option.id;
+            return (
+              <TouchableOpacity key={option.id ?? '__general__'} onPress={() => setMoveTarget(option)}
+                style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
+                <Text style={{ flex: 1, color: active ? '#fff' : c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                  {option.id === null ? t.transaction.moveModal.generalOption : option.name}
+                </Text>
+                {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ActionModalShell>
+
+      {/* ══ CORREGIR MONTO ══ */}
+      <ActionModalShell
+        visible={actionModal === 'correct'}
+        title={t.transaction.correctModal.title}
+        onClose={() => setActionModal(null)}
+        onSubmit={submitCorrect}
+        submitLabel={t.transaction.correctModal.submit}
+        submitting={actionSubmitting}
+        error={actionError}
+      >
+        <Input
+          label={t.transaction.correctModal.newAmountLabel}
+          value={newAmountText}
+          onChangeText={setNewAmountText}
+          keyboardType="decimal-pad"
+          leftIcon="cash-outline"
+        />
+        <Input
+          label={t.transaction.correctModal.reasonLabel}
+          placeholder={t.transaction.correctModal.reasonPlaceholder}
+          value={correctReason}
+          onChangeText={setCorrectReason}
+          leftIcon="document-text-outline"
+        />
+        <ConfirmField hasPin={!!user?.hasTransactionPin} value={confirmValue} onChangeText={setConfirmValue} />
+      </ActionModalShell>
+
+      {/* ══ ANULAR PAGO ══ */}
+      <ActionModalShell
+        visible={actionModal === 'void'}
+        title={t.transaction.voidModal.title}
+        onClose={() => setActionModal(null)}
+        onSubmit={submitVoid}
+        submitLabel={t.transaction.voidModal.submit}
+        submitting={actionSubmitting}
+        error={actionError}
+        submitColor={c.ACCENT_RED}
+      >
+        <Input
+          label={t.transaction.voidModal.reasonLabel}
+          placeholder={t.transaction.voidModal.reasonPlaceholder}
+          value={voidReason}
+          onChangeText={setVoidReason}
+          leftIcon="document-text-outline"
+        />
+        <ConfirmField hasPin={!!user?.hasTransactionPin} value={confirmValue} onChangeText={setConfirmValue} />
+      </ActionModalShell>
+
+      {/* ══ REVERTIR ANULACIÓN ══ */}
+      <ActionModalShell
+        visible={actionModal === 'reverseVoid'}
+        title={t.transaction.reverseVoidModal.title}
+        onClose={() => setActionModal(null)}
+        onSubmit={submitReverseVoid}
+        submitLabel={t.transaction.reverseVoidModal.submit}
+        submitting={actionSubmitting}
+        error={actionError}
+      >
+        <Input
+          label={t.transaction.reverseVoidModal.reasonLabel}
+          placeholder={t.transaction.reverseVoidModal.reasonPlaceholder}
+          value={reverseReason}
+          onChangeText={setReverseReason}
+          leftIcon="document-text-outline"
+        />
+      </ActionModalShell>
     </View>
   );
 }

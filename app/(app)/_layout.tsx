@@ -61,6 +61,14 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="general"
+          options={{
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon name={focused ? 'layers' : 'layers-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="stores"
           options={{
             tabBarIcon: ({ focused, color }) => (
@@ -85,6 +93,8 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="alert-center" options={{ href: null }} />
+        <Tabs.Screen name="manual-entry" options={{ href: null }} />
       </Tabs>
     </View>
   );

@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const QUEUE_KEY = 'yaplin.offlineTransactionQueue.v1';
 
 export interface QueuedTransactionPayload {
-  storeId: string;
   payerName: string;
   payerInitials: string;
   amount: number;

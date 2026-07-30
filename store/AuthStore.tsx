@@ -22,6 +22,8 @@ export interface AuthUser {
   active: boolean;
   businessId: string;
   businessName: string;
+  hasTransactionPin: boolean;
+  riskLevel: 'normal' | 'watch' | 'suspicious' | 'blocked';
   subscription?: SubscriptionSummary | null;
 }
 
@@ -37,6 +39,7 @@ interface AuthCtxValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearLogoutReason: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtxValue | null>(null);
@@ -136,8 +139,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearLogoutReason = () => setLogoutReason(null);
 
+  // Re-fetches /me so screens that change something on the user record (the
+  // transaction PIN, for instance) can pull the fresh value back into
+  // AuthStore without a full re-login.
+  async function refreshUser() {
+    if (!userRef.current) return;
+    const me = await api.get<AuthUser>('/me');
+    setUser(me);
+  }
+
   const value = useMemo<AuthCtxValue>(
-    () => ({ user, hydrated, logoutReason, login, logout, clearLogoutReason }),
+    () => ({ user, hydrated, logoutReason, login, logout, clearLogoutReason, refreshUser }),
     [user, hydrated, logoutReason]
   );
 

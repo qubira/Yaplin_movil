@@ -9,10 +9,16 @@ export function setApiToken(token: string | null) {
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(status: number, message: string, code?: string) {
+  // Full parsed JSON body of the error response (when the server sent one),
+  // so callers can read fields beyond `error`/`code` — e.g. anything else a
+  // specific endpoint might attach to a 409/403 payload — without this class
+  // needing to know about every endpoint's shape ahead of time.
+  body: Record<string, unknown> | null;
+  constructor(status: number, message: string, code?: string, body: Record<string, unknown> | null = null) {
     super(message);
     this.status = status;
     this.code = code;
+    this.body = body;
   }
 }
 
@@ -43,7 +49,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (code && ACCOUNT_BLOCK_CODES.has(code)) {
       onAccountBlocked?.(code, message);
     }
-    throw new ApiError(res.status, message, code);
+    throw new ApiError(res.status, message, code, data && typeof data === 'object' ? data : null);
   }
   return data as T;
 }
