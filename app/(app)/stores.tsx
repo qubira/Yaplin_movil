@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../constants/theme';
 import { PaymentColors } from '../../constants/colors';
 import { Store } from '../../mocks/stores';
-import { formatAmount, PaymentMethod } from '../../mocks/transactions';
+import { formatAmount } from '../../mocks/transactions';
 import { router } from 'expo-router';
 import { useStores, useTeam } from '../../store/StoresStore';
 import { useTransactions } from '../../store/PaymentsStore';
@@ -27,8 +27,9 @@ const METHOD_LOGOS = {
   izipay: require('../../assets/images/brands/izipay.png'),
 };
 
-const ALL_METHODS: PaymentMethod[] = ['yape', 'plin', 'izipay'];
-const METHOD_LABELS: Record<PaymentMethod, string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
+type StorePaymentMethod = 'yape' | 'plin' | 'izipay';
+const ALL_METHODS: StorePaymentMethod[] = ['yape', 'plin', 'izipay'];
+const METHOD_LABELS: Record<StorePaymentMethod, string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
 
 const EMPTY_REVENUE: StoreRevenue = { todayRevenue: 0, monthRevenue: 0, txnCount: 0 };
 
@@ -94,7 +95,7 @@ interface StoreFormData {
   name: string;
   address: string;
   account: string;
-  methods: PaymentMethod[];
+  methods: StorePaymentMethod[];
   status: 'active' | 'inactive';
 }
 
@@ -111,7 +112,7 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [account, setAccount] = useState('');
-  const [methods, setMethods] = useState<PaymentMethod[]>(['yape']);
+  const [methods, setMethods] = useState<StorePaymentMethod[]>(['yape']);
 
   useEffect(() => {
     if (!visible) return;
@@ -121,7 +122,7 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
     setMethods(initial?.methods ?? ['yape']);
   }, [visible, initial]);
 
-  function toggleMethod(m: PaymentMethod) {
+  function toggleMethod(m: StorePaymentMethod) {
     setMethods(prev => (prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]));
   }
 

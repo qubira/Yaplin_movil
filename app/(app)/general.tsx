@@ -18,12 +18,17 @@ import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import EmptyState from '../../components/ui/EmptyState';
 
-const METHOD_LOGOS = {
+// A manually-entered payment always has a real storeId (POST
+// /transactions/manual requires one), so it can never actually appear in
+// this GENERAL-only screen — but `txn: Transaction` still types `method` as
+// the full PaymentMethod, so these need a 'manual' entry for type safety
+// even though it's unreachable here in practice.
+const METHOD_LOGOS: Record<'yape' | 'plin' | 'izipay', any> = {
   yape:   require('../../assets/images/brands/yape.png'),
   plin:   require('../../assets/images/brands/plin.png'),
   izipay: require('../../assets/images/brands/izipay.png'),
 };
-const METHOD_LABELS: Record<string, string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
+const METHOD_LABELS: Record<string, string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay', manual: 'Manual' };
 
 function GeneralRow({ txn, onAssignMine, onAssignTo, canAssignMine, canPick, assigning }: {
   txn: Transaction;
@@ -76,7 +81,11 @@ function GeneralRow({ txn, onAssignMine, onAssignTo, canAssignMine, canPick, ass
             {txn.payerName}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-            <Image source={METHOD_LOGOS[txn.method]} style={{ width: 13, height: 13, borderRadius: 3 }} resizeMode="contain" />
+            {txn.method === 'manual' ? (
+              <Ionicons name="create-outline" size={13} color={color} />
+            ) : (
+              <Image source={METHOD_LOGOS[txn.method]} style={{ width: 13, height: 13, borderRadius: 3 }} resizeMode="contain" />
+            )}
             <Text style={{ color, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{METHOD_LABELS[txn.method]}</Text>
             <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12 }}>·</Text>
             <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular' }}>

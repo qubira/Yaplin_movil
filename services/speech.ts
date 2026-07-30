@@ -5,6 +5,7 @@ const METHOD_VERB: Record<Transaction['method'], string> = {
   yape: 'yapeó',
   plin: 'te plineó',
   izipay: 'pagó con Izipay',
+  manual: 'registró un pago',
 };
 
 function spokenAmount(amount: number): string {

@@ -10,7 +10,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const METHOD_LABELS: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
+const METHOD_LABELS: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay', manual: 'registro manual' };
 
 export async function requestPushPermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();

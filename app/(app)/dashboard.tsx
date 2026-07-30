@@ -24,12 +24,12 @@ type Period = 'Hoy' | 'Día' | 'Semana' | 'Mes';
 const { width: SW } = Dimensions.get('window');
 const MONTH_CELL_W = Math.floor((SW - 48 - 30) / 4);
 
-const METHOD_LOGOS = {
+const METHOD_LOGOS: Record<'yape' | 'plin' | 'izipay', any> = {
   yape:   require('../../assets/images/brands/yape.png'),
   plin:   require('../../assets/images/brands/plin.png'),
   izipay: require('../../assets/images/brands/izipay.png'),
 };
-const METHOD_LABELS: Record<string, string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
+const METHOD_LABELS: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay', manual: 'Manual' };
 
 function daysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
 
@@ -90,7 +90,11 @@ function VerTodosRow({ txn, onPress }: { txn: Transaction; onPress: () => void }
           {txn.payerName}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
-          <Image source={METHOD_LOGOS[txn.method]} style={{ width: 13, height: 13, borderRadius: 3 }} resizeMode="contain" />
+          {txn.method === 'manual' ? (
+            <Ionicons name="create-outline" size={13} color={color} />
+          ) : (
+            <Image source={METHOD_LOGOS[txn.method]} style={{ width: 13, height: 13, borderRadius: 3 }} resizeMode="contain" />
+          )}
           <Text style={{ color, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
             {METHOD_LABELS[txn.method]}
           </Text>
@@ -152,7 +156,7 @@ export default function DashboardScreen() {
   const total    = txnsAll.reduce((s, t) => s + t.amount, 0);
 
   const breakdown = useMemo(() => {
-    const out: Partial<Record<'yape'|'plin'|'izipay', { count: number; total: number }>> = {};
+    const out: Partial<Record<Transaction['method'], { count: number; total: number }>> = {};
     txnsAll.forEach(t => {
       if (!out[t.method]) out[t.method] = { count: 0, total: 0 };
       out[t.method]!.count++;
@@ -372,11 +376,15 @@ export default function DashboardScreen() {
 
                 {Object.keys(breakdown).length > 0 && (
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    {(Object.entries(breakdown) as [string, { count: number; total: number }][]).map(([method, data]) => {
-                      const color = PaymentColors[method as keyof typeof PaymentColors];
+                    {(Object.entries(breakdown) as [Transaction['method'], { count: number; total: number }][]).map(([method, data]) => {
+                      const color = PaymentColors[method];
                       return (
                         <View key={method} style={{ flex: 1, borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: `${color}40`, backgroundColor: `${color}15` }}>
-                          <Image source={METHOD_LOGOS[method as keyof typeof METHOD_LOGOS]} style={{ width: 22, height: 22, marginBottom: 6 }} resizeMode="contain" />
+                          {method === 'manual' ? (
+                            <Ionicons name="create-outline" size={22} color={color} style={{ marginBottom: 6 }} />
+                          ) : (
+                            <Image source={METHOD_LOGOS[method]} style={{ width: 22, height: 22, marginBottom: 6 }} resizeMode="contain" />
+                          )}
                           <Text style={{ color, fontSize: 20, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>{data.count}</Text>
                           <Text style={{ color: Colors.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{METHOD_LABELS[method]}</Text>
                           <Text style={{ color: Colors.SUCCESS, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 4 }}>{formatAmount(data.total)}</Text>

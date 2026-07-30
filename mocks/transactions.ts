@@ -1,4 +1,10 @@
-export type PaymentMethod = 'yape' | 'plin' | 'izipay';
+// 'manual' covers owner-entered payments (POST /transactions/manual) that
+// have no underlying Yape/Plin/Izipay notification — every method-keyed
+// lookup table in the app (colors, logos, labels) must account for it, or
+// a manual transaction crashes wherever that lookup is assumed to always
+// hit one of the other three (confirmed: this broke the detail screen,
+// which read `undefined.gradientColors` for any manual payment).
+export type PaymentMethod = 'yape' | 'plin' | 'izipay' | 'manual';
 
 export interface Transaction {
   id: string;

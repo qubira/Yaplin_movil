@@ -1,4 +1,5 @@
 import { View, Text, SectionList, TouchableOpacity, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { PaymentColors } from '../../constants/colors';
@@ -16,7 +17,7 @@ const methodLogos: Record<'yape' | 'plin' | 'izipay', any> = {
   izipay: require('../../assets/images/brands/izipay.png'),
 };
 
-const methodLabels: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
+const methodLabels: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay', manual: 'Manual' };
 
 export default function NotificationsScreen() {
   const { c } = useTheme();
@@ -48,7 +49,11 @@ export default function NotificationsScreen() {
       borderColor: item.read ? c.BORDER : `${c.ACCENT_CYAN}33`,
     }}>
       <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: `${PaymentColors[item.method]}22`, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-        <Image source={methodLogos[item.method] as any} style={{ width: 28, height: 28 }} resizeMode="contain" />
+        {item.method === 'manual' ? (
+          <Ionicons name="create-outline" size={22} color={PaymentColors.manual} />
+        ) : (
+          <Image source={methodLogos[item.method]} style={{ width: 28, height: 28 }} resizeMode="contain" />
+        )}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.TEXT_PRIMARY, fontWeight: item.read ? '400' : '600', fontSize: 14, fontFamily: item.read ? 'Inter_400Regular' : 'Inter_600SemiBold' }}>

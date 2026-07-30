@@ -12,8 +12,10 @@ interface TransactionItemProps {
   onPress?: () => void;
 }
 
-const methodLabels: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
-const methodLogos: Record<Transaction['method'], any> = {
+const methodLabels: Record<Transaction['method'], string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay', manual: 'Manual' };
+// 'manual' has no brand image — it's rendered as an Ionicon instead (see
+// the method-icon block below), never looked up in this map.
+const methodLogos: Record<'yape' | 'plin' | 'izipay', any> = {
   yape:   require('../../assets/images/brands/yape.png'),
   plin:   require('../../assets/images/brands/plin.png'),
   izipay: require('../../assets/images/brands/izipay.png'),
@@ -38,7 +40,11 @@ export default function TransactionItem({ transaction, onPress }: TransactionIte
           {transaction.payerName}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
-          <Image source={methodLogos[transaction.method] as any} style={{ width: 14, height: 14, borderRadius: 3 }} resizeMode="contain" />
+          {transaction.method === 'manual' ? (
+            <Ionicons name="create-outline" size={14} color={PaymentColors.manual} />
+          ) : (
+            <Image source={methodLogos[transaction.method]} style={{ width: 14, height: 14, borderRadius: 3 }} resizeMode="contain" />
+          )}
           <Text style={{ color: PaymentColors[transaction.method], fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
             {methodLabels[transaction.method]}
           </Text>

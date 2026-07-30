@@ -87,6 +87,9 @@ const METHOD = {
   yape:   { label: 'Yape',   logo: require('../../../assets/images/brands/yape.png'),   color: PaymentColors.yape,   gradientColors: ['#2D1060','#1A0A3C'] as [string, string] },
   plin:   { label: 'Plin',   logo: require('../../../assets/images/brands/plin.png'),   color: PaymentColors.plin,   gradientColors: ['#003D28','#001A12'] as [string, string] },
   izipay: { label: 'Izipay', logo: require('../../../assets/images/brands/izipay.png'), color: PaymentColors.izipay, gradientColors: ['#4A0008','#1E0004'] as [string, string] },
+  // No brand asset for manually-entered payments — `logo` is null and every
+  // render site below falls back to an Ionicon whenever it is.
+  manual: { label: 'Manual', logo: null as any,                                          color: PaymentColors.manual, gradientColors: ['#3A3A3C','#1C1C1E'] as [string, string] },
 } as const;
 
 function DetailRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
@@ -111,7 +114,11 @@ function HistoryItem({ txn, isLast }: { txn: Transaction; isLast: boolean }) {
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${brand.color}22` }}>
-            <Image source={brand.logo} style={{ width: 22, height: 22 }} resizeMode="contain" />
+            {brand.logo ? (
+              <Image source={brand.logo} style={{ width: 22, height: 22 }} resizeMode="contain" />
+            ) : (
+              <Ionicons name="create-outline" size={20} color={brand.color} />
+            )}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{brand.label}</Text>
@@ -131,7 +138,11 @@ function ModalTxnRow({ txn, noBorder }: { txn: Transaction; noBorder?: boolean }
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12, borderBottomWidth: noBorder ? 0 : 1, borderBottomColor: c.BORDER }}>
       <View style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, backgroundColor: `${brand.color}25`, borderColor: `${brand.color}50` }}>
-        <Image source={brand.logo} style={{ width: 22, height: 22 }} resizeMode="contain" />
+        {brand.logo ? (
+          <Image source={brand.logo} style={{ width: 22, height: 22 }} resizeMode="contain" />
+        ) : (
+          <Ionicons name="create-outline" size={20} color={brand.color} />
+        )}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{brand.label}</Text>
@@ -380,7 +391,7 @@ export default function TransactionDetailScreen() {
 
   const filteredBreakdown = useMemo(() => {
     const txns = visibleGroups.flatMap(g => g.txns);
-    const out: Partial<Record<'yape'|'plin'|'izipay', { count: number; total: number }>> = {};
+    const out: Partial<Record<Transaction['method'], { count: number; total: number }>> = {};
     txns.forEach(t => {
       if (!out[t.method]) out[t.method] = { count: 0, total: 0 };
       out[t.method]!.count++; out[t.method]!.total += t.amount;
@@ -584,7 +595,11 @@ export default function TransactionDetailScreen() {
             </TouchableOpacity>
           </View>
           <View style={{ width: 96, height: 96, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: `${brand.color}55`, marginBottom: 20, shadowColor: brand.color, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 12 }}>
-            <Image source={brand.logo} style={{ width: 60, height: 60 }} resizeMode="contain" />
+            {brand.logo ? (
+              <Image source={brand.logo} style={{ width: 60, height: 60 }} resizeMode="contain" />
+            ) : (
+              <Ionicons name="create-outline" size={48} color={brand.color} />
+            )}
           </View>
           <Text style={{
             color: '#fff', fontSize: 46, fontWeight: '800', fontFamily: 'Inter_800ExtraBold', letterSpacing: -1.5, marginBottom: isEdited ? 4 : 12,
@@ -791,11 +806,15 @@ export default function TransactionDetailScreen() {
                 </View>
                 <View style={{ height: 1, backgroundColor: c.isDark ? 'rgba(255,255,255,0.08)' : c.BORDER, marginVertical: 16 }} />
                 <View style={{ flexDirection: 'row', gap: 10 }}>
-                  {(Object.entries(filteredBreakdown) as [string, { count: number; total: number }][]).map(([method, data]) => {
-                    const b = METHOD[method as keyof typeof METHOD];
+                  {(Object.entries(filteredBreakdown) as [Transaction['method'], { count: number; total: number }][]).map(([method, data]) => {
+                    const b = METHOD[method];
                     return (
                       <View key={method} style={{ flex: 1, borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: `${b.color}40`, backgroundColor: `${b.color}15` }}>
-                        <Image source={b.logo} style={{ width: 24, height: 24, marginBottom: 8 }} resizeMode="contain" />
+                        {b.logo ? (
+                          <Image source={b.logo} style={{ width: 24, height: 24, marginBottom: 8 }} resizeMode="contain" />
+                        ) : (
+                          <Ionicons name="create-outline" size={24} color={b.color} style={{ marginBottom: 8 }} />
+                        )}
                         <Text style={{ color: b.color, fontSize: 20, fontWeight: '800', fontFamily: 'Inter_800ExtraBold' }}>{data.count}</Text>
                         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{b.label}</Text>
                         <Text style={{ color: c.SUCCESS, fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 4 }}>{formatAmount(data.total)}</Text>

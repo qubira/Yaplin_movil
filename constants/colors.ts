@@ -25,4 +25,5 @@ export const PaymentColors = {
   yape: '#6C1FC6',
   plin: '#00A86B',
   izipay: '#E8000D',
+  manual: '#8E8E93',
 } as const;
