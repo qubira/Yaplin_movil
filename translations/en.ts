@@ -186,6 +186,8 @@ const en: typeof es = {
     membersTitle: 'Members',
     allStores: 'All stores',
     storeAssignedLabel: 'Assigned store',
+    soundAlertLabel: 'Sound alert',
+    soundAlertDescription: 'Plays a voice alert when a payment assigned to their store arrives through YapLin.',
     deleteAlert: {
       title: 'Delete member',
       message: (name: string) => `Delete "${name}" from the team?`,

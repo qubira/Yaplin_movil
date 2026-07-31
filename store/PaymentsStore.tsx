@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useCallback, useMemo, useRef, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Transaction } from '../mocks/transactions';
 import { api } from '../services/api';
+import { announcePayment } from '../services/speech';
+import { notifyPaymentReceived } from '../services/pushNotifications';
 import { useAuth } from './AuthStore';
 
 const INTEGRATIONS_KEY = 'yaplin.integrations.v1';
@@ -167,10 +169,22 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)).catch(() => {});
   }, [preferences, hydrated]);
 
+  // Tracks each transaction's storeId as of the last successful fetch, so a
+  // supervisor/cajero (who never has Integraciones on — see
+  // useNotificationCapture.ts) can still get a sound/push alert when a
+  // payment newly lands on THEIR store via sync/routing, instead of only
+  // the owner ever hearing anything (the owner's alert comes from their
+  // device's own native Yape/Plin/Izipay listener, a completely separate
+  // path in useNotificationCapture.ts). `null` means "first load, nothing
+  // to diff against yet" — otherwise every payment already on the store
+  // would announce itself the moment the app opens.
+  const prevStoreIdByIdRef = useRef<Map<string, string | null> | null>(null);
+
   const refreshTransactions = useCallback(async () => {
     if (!user) {
       setTransactions([]);
       setTransactionsLoading(false);
+      prevStoreIdByIdRef.current = null;
       return;
     }
     // Only show the loader on the first real fetch — the 10s background
@@ -178,12 +192,45 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     if (!hasLoadedTransactionsOnceRef.current) setTransactionsLoading(true);
     try {
       const remote = await api.get<RemoteTransaction[]>('/transactions');
-      setTransactions(remote.map(fromRemote));
+      const next = remote.map(fromRemote);
+
+      if (user.role !== 'owner' && prevStoreIdByIdRef.current) {
+        const prevStoreById = prevStoreIdByIdRef.current;
+        const newlyMine = next.filter((txn) => {
+          if (txn.storeId !== user.storeId) return false;
+          return prevStoreById.get(txn.id) !== user.storeId; // wasn't already theirs last check
+        });
+        // Voice is gated by BOTH the owner/supervisor-assigned permission
+        // (user.soundAlertEnabled) and this device's own personal toggle
+        // (preferences.voiceEnabled) — the permission decides whether this
+        // member is allowed to hear payments at all, the toggle is theirs to
+        // mute it moment-to-moment. Push has no such admin permission (it
+        // never did, even before this feature), just their own toggle.
+        if (user.soundAlertEnabled && preferences.voiceEnabled) {
+          newlyMine.forEach((txn) => {
+            try {
+              announcePayment(txn);
+            } catch (e) {
+              if (__DEV__) console.log('[YapLin] announcePayment (sync) ERROR', String(e));
+            }
+          });
+        }
+        if (preferences.pushEnabled) {
+          newlyMine.forEach((txn) => {
+            notifyPaymentReceived(txn).catch((e) => {
+              if (__DEV__) console.log('[YapLin] notifyPaymentReceived (sync) ERROR', String(e));
+            });
+          });
+        }
+      }
+      prevStoreIdByIdRef.current = new Map(next.map((txn) => [txn.id, txn.storeId]));
+
+      setTransactions(next);
     } finally {
       hasLoadedTransactionsOnceRef.current = true;
       setTransactionsLoading(false);
     }
-  }, [user]);
+  }, [user, preferences.voiceEnabled, preferences.pushEnabled]);
 
   useEffect(() => {
     refreshTransactions().catch(() => {});

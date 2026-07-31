@@ -97,6 +97,7 @@ model User {
   active             Boolean   @default(true)
   riskLevel          RiskLevel @default(normal)
   transactionPinHash String?
+  soundAlertEnabled  Boolean   @default(true)
   createdAt          DateTime  @default(now())
 }
 

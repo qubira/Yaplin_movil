@@ -21,6 +21,7 @@ router.get('/', requireAuth, async (req, res) => {
     businessName: user.business.name,
     hasTransactionPin: !!user.transactionPinHash,
     riskLevel: user.riskLevel,
+    soundAlertEnabled: user.soundAlertEnabled,
     subscription,
   });
 });

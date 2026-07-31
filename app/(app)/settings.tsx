@@ -561,33 +561,43 @@ export default function SettingsScreen() {
             <ToggleRow icon="volume-medium-outline" label={t.settings.notifications.voiceAlert} value={preferences.voiceEnabled} onValueChange={setVoiceEnabled} />
           </View>
 
-          {/* Integraciones */}
-          <SectionTitle title={t.settings.section.integrations} />
-          {Platform.OS !== 'android' ? (
-            <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Ionicons name="information-circle-outline" size={20} color={c.TEXT_SECONDARY} />
-              <Text style={{ flex: 1, color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 }}>
-                {t.settings.integrations.androidOnly}
-              </Text>
-            </View>
-          ) : (
-            <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
-              <IntegrationRow name="Yape" color={PaymentColors.yape} icon="phone-portrait-outline"
-                connected={integrations.yape} onToggle={() => requestOrToggle(integrations.yape, setYape)} />
-              <IntegrationRow name="Plin" color={PaymentColors.plin} icon="wallet-outline"
-                connected={plinConnectedCount > 0}
-                connectedLabel={t.settings.integrations.bankCount(plinConnectedCount)}
-                onToggle={openPlinSheet} />
-              <IntegrationRow name="Izipay" color={PaymentColors.izipay} icon="card-outline"
-                connected={integrations.izipay} onToggle={() => requestOrToggle(integrations.izipay, setIzipay)} />
-              {!permissionGranted && (
-                <View style={{ paddingVertical: 14 }}>
-                  <Text style={{ color: c.WARNING, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 }}>
-                    {t.settings.integrations.permissionWarning}
+          {/* Integraciones — owner-only: this connects a physical device's
+              native Yape/Plin/Izipay notification listener, which only
+              makes sense on the phone actually running the business's
+              official accounts. Letting a cajero/supervisor also connect
+              their own personal Yape/Plin here would capture payments that
+              have nothing to do with the business, so the whole section is
+              hidden rather than shown-disabled for those roles. */}
+          {user?.role === 'owner' && (
+            <>
+              <SectionTitle title={t.settings.section.integrations} />
+              {Platform.OS !== 'android' ? (
+                <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Ionicons name="information-circle-outline" size={20} color={c.TEXT_SECONDARY} />
+                  <Text style={{ flex: 1, color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 }}>
+                    {t.settings.integrations.androidOnly}
                   </Text>
                 </View>
+              ) : (
+                <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+                  <IntegrationRow name="Yape" color={PaymentColors.yape} icon="phone-portrait-outline"
+                    connected={integrations.yape} onToggle={() => requestOrToggle(integrations.yape, setYape)} />
+                  <IntegrationRow name="Plin" color={PaymentColors.plin} icon="wallet-outline"
+                    connected={plinConnectedCount > 0}
+                    connectedLabel={t.settings.integrations.bankCount(plinConnectedCount)}
+                    onToggle={openPlinSheet} />
+                  <IntegrationRow name="Izipay" color={PaymentColors.izipay} icon="card-outline"
+                    connected={integrations.izipay} onToggle={() => requestOrToggle(integrations.izipay, setIzipay)} />
+                  {!permissionGranted && (
+                    <View style={{ paddingVertical: 14 }}>
+                      <Text style={{ color: c.WARNING, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 }}>
+                        {t.settings.integrations.permissionWarning}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               )}
-            </View>
+            </>
           )}
 
           {/* Idioma */}

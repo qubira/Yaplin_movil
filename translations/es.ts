@@ -184,6 +184,8 @@ const es = {
     membersTitle: 'Miembros',
     allStores: 'Todas las tiendas',
     storeAssignedLabel: 'Tienda asignada',
+    soundAlertLabel: 'Alerta de sonido',
+    soundAlertDescription: 'Reproduce un aviso de voz cuando le llega un pago asignado a su tienda a través de YapLin.',
     deleteAlert: {
       title: 'Eliminar miembro',
       message: (name: string) => `¿Eliminar a "${name}" del equipo?`,

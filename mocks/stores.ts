@@ -15,5 +15,6 @@ export interface TeamMember {
   email: string;
   storeId: string | 'all';
   active: boolean;
+  soundAlertEnabled: boolean;
 }
 

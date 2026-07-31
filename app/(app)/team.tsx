@@ -70,14 +70,14 @@ function memberEditPermissions(
   viewerRole: TeamMember['role'] | undefined,
   viewerId: string | undefined,
   target: TeamMember
-): { canEdit: boolean; canEditRole: boolean; canEditStore: boolean } {
-  if (viewerRole === 'owner') return { canEdit: true, canEditRole: true, canEditStore: true };
+): { canEdit: boolean; canEditRole: boolean; canEditStore: boolean; canEditSound: boolean } {
+  if (viewerRole === 'owner') return { canEdit: true, canEditRole: true, canEditStore: true, canEditSound: true };
   const isSelf = viewerId === target.id;
   if (viewerRole === 'supervisor') {
-    if (isSelf) return { canEdit: true, canEditRole: false, canEditStore: false };
-    if (target.role === 'cajero') return { canEdit: true, canEditRole: false, canEditStore: true };
+    if (isSelf) return { canEdit: true, canEditRole: false, canEditStore: false, canEditSound: false };
+    if (target.role === 'cajero') return { canEdit: true, canEditRole: false, canEditStore: true, canEditSound: true };
   }
-  return { canEdit: false, canEditRole: false, canEditStore: false };
+  return { canEdit: false, canEditRole: false, canEditStore: false, canEditSound: false };
 }
 
 function MemberCard({ member, storeName, onPress }: { member: TeamMember; storeName: string; onPress: () => void }) {
@@ -123,10 +123,11 @@ interface MemberFormData {
   email: string;
   role: TeamMember['role'];
   storeId: string;
+  soundAlertEnabled: boolean;
   password?: string;
 }
 
-function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canEditRole = true, canEditStore = true }: {
+function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canEditRole = true, canEditStore = true, canEditSound = true }: {
   onClose: () => void;
   initial: TeamMember | null;
   storeOptions: { id: string; name: string }[];
@@ -134,6 +135,7 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
   title: string;
   canEditRole?: boolean;
   canEditStore?: boolean;
+  canEditSound?: boolean;
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -145,6 +147,7 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<TeamMember['role']>(initial?.role ?? 'cajero');
   const [storeId, setStoreId] = useState<string>(initial?.storeId ?? 'all');
+  const [soundAlertEnabled, setSoundAlertEnabled] = useState(initial?.soundAlertEnabled ?? true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const { present, dismiss } = useBottomSheet();
@@ -168,7 +171,7 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
     setError('');
     setSaving(true);
     try {
-      await onSubmit({ name: name.trim(), email: email.trim(), role, storeId, ...(password ? { password } : {}) });
+      await onSubmit({ name: name.trim(), email: email.trim(), role, storeId, soundAlertEnabled, ...(password ? { password } : {}) });
       onClose();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t.team.form.saveError);
@@ -235,6 +238,24 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
           </>
         )}
 
+        {canEditSound && role !== 'owner' && (
+          <>
+            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.soundAlertLabel}</Text>
+            <View style={{ borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="volume-medium-outline" size={18} color={c.TEXT_SECONDARY} style={{ marginRight: 10 }} />
+              <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 }}>
+                {t.team.soundAlertDescription}
+              </Text>
+              <Switch
+                value={soundAlertEnabled}
+                onValueChange={setSoundAlertEnabled}
+                trackColor={{ false: c.BORDER, true: `${c.ACCENT_PURPLE}80` }}
+                thumbColor={soundAlertEnabled ? c.ACCENT_PURPLE : c.TEXT_SECONDARY}
+              />
+            </View>
+          </>
+        )}
+
         {!!error && (
           <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 16 }}>{error}</Text>
         )}
@@ -277,6 +298,7 @@ export default function TeamScreen() {
         storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
         title={t.team.addMemberTitle}
         canEditRole={user?.role === 'owner'}
+        canEditSound={user?.role === 'owner' || user?.role === 'supervisor'}
         onSubmit={(data) => addMember({ ...data, password: data.password ?? '', active: true })}
       />
     );
@@ -292,6 +314,7 @@ export default function TeamScreen() {
         title={t.team.editMemberTitle}
         canEditRole={editingPerms.canEditRole}
         canEditStore={editingPerms.canEditStore}
+        canEditSound={editingPerms.canEditSound}
         onSubmit={(data) => updateMember(member.id, data)}
       />
     );

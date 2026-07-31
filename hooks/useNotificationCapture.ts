@@ -121,8 +121,16 @@ export function useNotificationCapture() {
   // non-expired) session: the native side skips its isPackageAllowed check up
   // front (see ExpoAndroidNotificationListenerService.kt), so notifications
   // never even cross the JS bridge for a blocked account.
+  //
+  // Also empty for anyone but the owner — Integraciones (connecting a
+  // device's own Yape/Plin/Izipay notification listener) is owner-only in
+  // the UI now, but `integrations` is local AsyncStorage state that could
+  // already be true on a cajero/supervisor's device from before that
+  // restriction shipped. Re-checking the role here (not just hiding the
+  // toggle) is what actually stops their phone from reading those apps'
+  // notifications.
   const allowedPackages = useMemo(() => {
-    if (Platform.OS !== 'android' || !preferences.captureActive || !user) return [] as string[];
+    if (Platform.OS !== 'android' || !preferences.captureActive || !user || user.role !== 'owner') return [] as string[];
     const packages: string[] = [];
     if (integrations.yape) packages.push(YAPE_PACKAGE);
     if (integrations.izipay) packages.push(IZIPAY_PACKAGE);

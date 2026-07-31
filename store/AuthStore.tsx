@@ -24,6 +24,7 @@ export interface AuthUser {
   businessName: string;
   hasTransactionPin: boolean;
   riskLevel: 'normal' | 'watch' | 'suspicious' | 'blocked';
+  soundAlertEnabled: boolean;
   subscription?: SubscriptionSummary | null;
 }
 

@@ -15,8 +15,11 @@ function initialsOf(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 }
 
-function toPublicUser(user: { id: string; email: string; name: string; initials: string; role: string; storeId: string | null; active: boolean }) {
-  return { id: user.id, email: user.email, name: user.name, initials: user.initials, role: user.role, storeId: user.storeId, active: user.active };
+function toPublicUser(user: { id: string; email: string; name: string; initials: string; role: string; storeId: string | null; active: boolean; soundAlertEnabled: boolean }) {
+  return {
+    id: user.id, email: user.email, name: user.name, initials: user.initials,
+    role: user.role, storeId: user.storeId, active: user.active, soundAlertEnabled: user.soundAlertEnabled,
+  };
 }
 
 // True when `err` is Prisma's unique-constraint violation (wraps Postgres
@@ -42,7 +45,7 @@ router.get('/', async (req, res) => {
 // restricted in PUT /:id.
 router.post('/', async (req, res) => {
   const auth = req.auth!;
-  const { name, email: rawEmail, password, role, storeId } = req.body ?? {};
+  const { name, email: rawEmail, password, role, storeId, soundAlertEnabled } = req.body ?? {};
   if (!name || !rawEmail || !password || !role) return res.status(400).json({ error: 'Faltan campos requeridos' });
 
   if (auth.role === 'cajero' || (auth.role === 'supervisor' && role !== 'cajero')) {
@@ -80,6 +83,7 @@ router.post('/', async (req, res) => {
           role,
           storeId: storeId === 'all' || !storeId ? null : storeId,
           active: true,
+          soundAlertEnabled: soundAlertEnabled === undefined ? true : !!soundAlertEnabled,
         },
       });
 
@@ -121,7 +125,7 @@ function allowedTeamEditFields(
   if (actorRole === 'cajero') return [];
   // supervisor
   if (isSelf) return ['name', 'password'];
-  if (targetRole === 'cajero') return ['name', 'password', 'storeId', 'active'];
+  if (targetRole === 'cajero') return ['name', 'password', 'storeId', 'active', 'soundAlertEnabled'];
   return []; // another supervisor, or the owner
 }
 
@@ -130,7 +134,7 @@ router.put('/:id', async (req, res) => {
   const existing = await prisma.user.findFirst({ where: { id: req.params.id, businessId: auth.businessId } });
   if (!existing) return res.status(404).json({ error: 'Miembro no encontrado' });
 
-  const { name, email: rawEmail, password, role, storeId, active } = req.body ?? {};
+  const { name, email: rawEmail, password, role, storeId, active, soundAlertEnabled } = req.body ?? {};
   const email = rawEmail !== undefined ? normalizeEmail(rawEmail) : undefined;
   const normalizedStoreId = storeId !== undefined ? (storeId === 'all' || !storeId ? null : storeId) : undefined;
 
@@ -148,6 +152,7 @@ router.put('/:id', async (req, res) => {
     if (role !== undefined && role !== existing.role) changedFields.push('role');
     if (normalizedStoreId !== undefined && normalizedStoreId !== existing.storeId) changedFields.push('storeId');
     if (active !== undefined && active !== existing.active) changedFields.push('active');
+    if (soundAlertEnabled !== undefined && soundAlertEnabled !== existing.soundAlertEnabled) changedFields.push('soundAlertEnabled');
     if (password) changedFields.push('password');
 
     const disallowed = changedFields.filter((f) => !allowedFields.includes(f));
@@ -180,6 +185,7 @@ router.put('/:id', async (req, res) => {
   if (role !== undefined) data.role = role;
   if (normalizedStoreId !== undefined) data.storeId = normalizedStoreId;
   if (active !== undefined) data.active = active;
+  if (soundAlertEnabled !== undefined) data.soundAlertEnabled = !!soundAlertEnabled;
   if (password) data.passwordHash = await bcrypt.hash(password, 10);
 
   const fieldChanges: Record<string, { old: string | null; new: string | null }> = {};
