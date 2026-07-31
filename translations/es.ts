@@ -116,6 +116,12 @@ const es = {
       version: 'Versión',
       channel: 'Canal',
       update: 'Actualización',
+      history: 'Historial de actualizaciones',
+    },
+    changelogModal: {
+      title: 'Historial de actualizaciones',
+      empty: 'Todavía no hay actualizaciones registradas.',
+      done: 'Listo',
     },
     plinModal: {
       title: 'Plin por banco',

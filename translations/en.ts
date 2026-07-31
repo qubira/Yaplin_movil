@@ -118,6 +118,12 @@ const en: typeof es = {
       version: 'Version',
       channel: 'Channel',
       update: 'Update',
+      history: 'Update history',
+    },
+    changelogModal: {
+      title: 'Update history',
+      empty: 'No updates recorded yet.',
+      done: 'Done',
     },
     plinModal: {
       title: 'Plin by bank',

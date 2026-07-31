@@ -15,6 +15,7 @@ import { isNotificationAccessGranted, openNotificationAccessSettings } from '../
 import { isXiaomiDevice, openXiaomiAutostartSettings, requestIgnoreBatteryOptimizations } from '../../services/backgroundReliability';
 import { requestPushPermission } from '../../services/pushNotifications';
 import { getAppVersionInfo } from '../../services/appVersion';
+import { CHANGELOG } from '../../constants/changelog';
 import { useTopInset } from '../../hooks/useTopInset';
 import { useBottomSheet } from '../../store/BottomSheetStore';
 import Avatar from '../../components/ui/Avatar';
@@ -314,13 +315,69 @@ function LanguageSheetContent({ onClose }: { onClose: () => void }) {
   );
 }
 
+function ChangelogSheetContent({ onClose }: { onClose: () => void }) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  const { locale } = useLocale();
+  const lang = locale === 'en' ? 'en' : 'es';
+
+  return (
+    <View style={{
+      backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
+      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '80%',
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }}>
+      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+      <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>
+        {t.settings.changelogModal.title}
+      </Text>
+      {CHANGELOG.length === 0 ? (
+        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 24 }}>
+          {t.settings.changelogModal.empty}
+        </Text>
+      ) : (
+        <ScrollView keyboardShouldPersistTaps="handled">
+          {CHANGELOG.map((entry, i) => (
+            <View key={entry.version} style={{
+              paddingBottom: 16, marginBottom: 16,
+              borderBottomWidth: i === CHANGELOG.length - 1 ? 0 : 1, borderBottomColor: c.BORDER,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+                <Text style={{ color: c.TEXT_PRIMARY, fontSize: 15, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>
+                  v{entry.version}
+                </Text>
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+                  {entry.date}
+                </Text>
+              </View>
+              {entry.changes.map((change, j) => (
+                <View key={j} style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                  <Text style={{ color: c.ACCENT_PURPLE, fontSize: 13, fontFamily: 'Inter_400Regular' }}>•</Text>
+                  <Text style={{ flex: 1, color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 }}>
+                    {change[lang]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
+      )}
+      <TouchableOpacity onPress={onClose}
+        style={{ marginTop: 4, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+        <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.changelogModal.done}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = useTopInset(24);
   const t = useTranslation();
-  const { locale, setLocale } = useLocale();
-  const { integrations, setYape, setIzipay, setPlinBank } = useIntegrations();
+  const { locale } = useLocale();
+  const { integrations, setYape, setIzipay } = useIntegrations();
   const { preferences, setVoiceEnabled, setPushEnabled, setCaptureActive } = usePreferences();
 
   async function togglePush(v: boolean) {
@@ -352,6 +409,10 @@ export default function SettingsScreen() {
 
   function openLanguageSheet() {
     present(<LanguageSheetContent onClose={dismiss} />);
+  }
+
+  function openChangelogSheet() {
+    present(<ChangelogSheetContent onClose={dismiss} />);
   }
 
   // When "Conectar" has to send the user to Android Settings first, we remember
@@ -559,10 +620,18 @@ export default function SettingsScreen() {
               <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.about.channel}</Text>
               <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.channel}</Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
               <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.settings.about.update}</Text>
               <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{versionInfo.updateLabel}</Text>
             </View>
+            <TouchableOpacity onPress={openChangelogSheet}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }}>
+              <Ionicons name="time-outline" size={18} color={c.ACCENT_PURPLE} style={{ marginRight: 10 }} />
+              <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                {t.settings.about.history}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={c.TEXT_SECONDARY} />
+            </TouchableOpacity>
           </View>
 
         </View>
