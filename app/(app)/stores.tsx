@@ -17,6 +17,7 @@ import { useTranslation } from '../../store/LocaleStore';
 import { computeStoreRevenue, StoreRevenue } from '../../services/storeRevenue';
 import { useTopInset } from '../../hooks/useTopInset';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useBottomSheet } from '../../store/BottomSheetStore';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
@@ -101,8 +102,7 @@ interface StoreFormData {
   status: 'active' | 'inactive';
 }
 
-function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
-  visible: boolean;
+function StoreFormSheet({ onClose, initial, onSubmit, title }: {
   onClose: () => void;
   initial: Store | null;
   onSubmit: (data: StoreFormData) => void;
@@ -111,19 +111,10 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const t = useTranslation();
-  const keyboardHeight = useKeyboardHeight();
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [account, setAccount] = useState('');
-  const [methods, setMethods] = useState<StorePaymentMethod[]>(['yape']);
-
-  useEffect(() => {
-    if (!visible) return;
-    setName(initial?.name ?? '');
-    setAddress(initial?.address ?? '');
-    setAccount(initial?.account ?? '');
-    setMethods(initial?.methods ?? ['yape']);
-  }, [visible, initial]);
+  const [name, setName] = useState(initial?.name ?? '');
+  const [address, setAddress] = useState(initial?.address ?? '');
+  const [account, setAccount] = useState(initial?.account ?? '');
+  const [methods, setMethods] = useState<StorePaymentMethod[]>(initial?.methods ?? ['yape']);
 
   function toggleMethod(m: StorePaymentMethod) {
     setMethods(prev => (prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]));
@@ -136,57 +127,46 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      {/* The dark overlay stays a plain flex:1 View (always covers the full
-          screen) — only the sheet card itself moves for the keyboard, via
-          useKeyboardHeight()'s tracked height (see hooks/useKeyboardHeight.ts
-          for why this replaced KeyboardAvoidingView: it left a residual gap
-          right after the keyboard was dismissed). */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
-        <View style={[styles.addSheet, {
-          backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
-          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
-        }]}>
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <View style={[styles.sheetHandle, { backgroundColor: c.BORDER }]} />
-            <Text style={[styles.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
-            <View style={{ gap: 4 }}>
-              <Input label={t.common.form.name} placeholder={t.stores.form.namePlaceholder} value={name} onChangeText={setName} leftIcon="business-outline" />
-              <View style={{ height: 8 }} />
-              <Input label={t.stores.form.addressLabel} placeholder={t.stores.form.addressPlaceholder} value={address} onChangeText={setAddress} leftIcon="location-outline" />
-              <View style={{ height: 8 }} />
-              <Input label={t.stores.notificationAccountLabel} placeholder={t.stores.form.accountPlaceholder} value={account} onChangeText={setAccount} keyboardType="email-address" leftIcon="mail-outline" />
-            </View>
-            <Text style={[styles.detailSectionLabel, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.paymentMethodsLabel}</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {ALL_METHODS.map(m => {
-                const active = methods.includes(m);
-                const color = PaymentColors[m];
-                return (
-                  <TouchableOpacity key={m} onPress={() => toggleMethod(m)} activeOpacity={0.8}
-                    style={{ flex: 1, borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1, backgroundColor: active ? `${color}18` : c.BACKGROUND_CARD_2, borderColor: active ? `${color}55` : c.BORDER }}>
-                    <Image source={METHOD_LOGOS[m]} style={{ width: 26, height: 26, opacity: active ? 1 : 0.4 }} resizeMode="contain" />
-                    <Text style={{ color: active ? color : c.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
-                      {METHOD_LABELS[m]}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <TouchableOpacity onPress={handleSubmit} disabled={!name.trim()}
-              style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: name.trim() ? c.ACCENT_PURPLE : c.BORDER }}>
-              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.save}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onClose}
-              style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
-            </TouchableOpacity>
-          </ScrollView>
+    <View style={[styles.addSheet, {
+      backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }]}>
+      <ScrollView keyboardShouldPersistTaps="handled">
+        <View style={[styles.sheetHandle, { backgroundColor: c.BORDER }]} />
+        <Text style={[styles.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
+        <View style={{ gap: 4 }}>
+          <Input label={t.common.form.name} placeholder={t.stores.form.namePlaceholder} value={name} onChangeText={setName} leftIcon="business-outline" />
+          <View style={{ height: 8 }} />
+          <Input label={t.stores.form.addressLabel} placeholder={t.stores.form.addressPlaceholder} value={address} onChangeText={setAddress} leftIcon="location-outline" />
+          <View style={{ height: 8 }} />
+          <Input label={t.stores.notificationAccountLabel} placeholder={t.stores.form.accountPlaceholder} value={account} onChangeText={setAccount} keyboardType="email-address" leftIcon="mail-outline" />
         </View>
+        <Text style={[styles.detailSectionLabel, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.paymentMethodsLabel}</Text>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {ALL_METHODS.map(m => {
+            const active = methods.includes(m);
+            const color = PaymentColors[m];
+            return (
+              <TouchableOpacity key={m} onPress={() => toggleMethod(m)} activeOpacity={0.8}
+                style={{ flex: 1, borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1, backgroundColor: active ? `${color}18` : c.BACKGROUND_CARD_2, borderColor: active ? `${color}55` : c.BORDER }}>
+                <Image source={METHOD_LOGOS[m]} style={{ width: 26, height: 26, opacity: active ? 1 : 0.4 }} resizeMode="contain" />
+                <Text style={{ color: active ? color : c.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
+                  {METHOD_LABELS[m]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </View>
-    </Modal>
+        <TouchableOpacity onPress={handleSubmit} disabled={!name.trim()}
+          style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: name.trim() ? c.ACCENT_PURPLE : c.BORDER }}>
+          <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.save}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onClose}
+          style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+          <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -202,10 +182,31 @@ export default function StoresScreen() {
   const isOwner = user?.role === 'owner';
 
   const keyboardHeight = useKeyboardHeight();
-  const [addModal, setAddModal] = useState(false);
-  const [editingStore, setEditingStore] = useState<Store | null>(null);
+  const { present, dismiss } = useBottomSheet();
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [historySearch, setHistorySearch] = useState('');
+
+  function openAddSheet() {
+    present(
+      <StoreFormSheet
+        onClose={dismiss}
+        initial={null}
+        title={t.stores.addStoreTitle}
+        onSubmit={(data) => addStore(data)}
+      />
+    );
+  }
+
+  function openEditSheet(store: Store) {
+    present(
+      <StoreFormSheet
+        onClose={dismiss}
+        initial={store}
+        title={t.stores.editStoreTitle}
+        onSubmit={(data) => updateStore(store.id, data)}
+      />
+    );
+  }
 
   const selectedStore = stores.find(s => s.id === selectedStoreId) ?? null;
 
@@ -253,7 +254,7 @@ export default function StoresScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <RefreshButton onRefresh={refreshStoresView} />
           {isOwner && (
-            <TouchableOpacity onPress={() => setAddModal(true)}
+            <TouchableOpacity onPress={openAddSheet}
               style={[styles.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
               <Ionicons name="add" size={20} color="#fff" />
             </TouchableOpacity>
@@ -330,7 +331,7 @@ export default function StoresScreen() {
               </View>
               {isOwner && (
                 <>
-                  <TouchableOpacity onPress={() => setEditingStore(selectedStore)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
+                  <TouchableOpacity onPress={() => openEditSheet(selectedStore)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
                     <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleDelete(selectedStore)} style={[styles.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
@@ -442,23 +443,6 @@ export default function StoresScreen() {
         )}
       </Modal>
 
-      {/* Add store */}
-      <StoreFormSheet
-        visible={addModal}
-        onClose={() => setAddModal(false)}
-        initial={null}
-        title={t.stores.addStoreTitle}
-        onSubmit={(data) => addStore(data)}
-      />
-
-      {/* Edit store */}
-      <StoreFormSheet
-        visible={!!editingStore}
-        onClose={() => setEditingStore(null)}
-        initial={editingStore}
-        title={t.stores.editStoreTitle}
-        onSubmit={(data) => { if (editingStore) updateStore(editingStore.id, data); }}
-      />
     </View>
   );
 }

@@ -16,7 +16,7 @@ import { isXiaomiDevice, openXiaomiAutostartSettings, requestIgnoreBatteryOptimi
 import { requestPushPermission } from '../../services/pushNotifications';
 import { getAppVersionInfo } from '../../services/appVersion';
 import { useTopInset } from '../../hooks/useTopInset';
-import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useBottomSheet } from '../../store/BottomSheetStore';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
@@ -149,8 +149,11 @@ function SectionTitle({ title }: { title: string }) {
 // Set/change/remove the money-action confirmation PIN — PATCH /me/pin always
 // requires the current password too, since the PIN is what stands between
 // an unlocked phone and editing/voiding money.
-function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
-  visible: boolean;
+//
+// Rendered via useBottomSheet().present() instead of its own <Modal> — see
+// store/BottomSheetStore.tsx for why. Mounting fresh on each present() call
+// means fields always start blank, no reset-on-visible effect needed.
+function PinSheetCard({ mode, hasExisting, onClose, onSaved }: {
   mode: 'save' | 'remove';
   hasExisting: boolean;
   onClose: () => void;
@@ -159,18 +162,10 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const t = useTranslation();
-  const keyboardHeight = useKeyboardHeight();
   const [password, setPassword] = useState('');
   const [newPin, setNewPin] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!visible) return;
-    setPassword('');
-    setNewPin('');
-    setError('');
-  }, [visible]);
 
   async function handleSubmit() {
     if (!password) { setError(t.settings.pinModal.missingPassword); return; }
@@ -194,60 +189,49 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
   const title = mode === 'remove' ? t.settings.security.removePin : hasExisting ? t.settings.pinModal.titleChange : t.settings.pinModal.titleSet;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      {/* The dark overlay stays a plain flex:1 View (always covers the full
-          screen) — only the sheet card itself moves for the keyboard, via
-          useKeyboardHeight()'s tracked height (see hooks/useKeyboardHeight.ts
-          for why this replaced KeyboardAvoidingView: it left a residual gap
-          right after the keyboard was dismissed). */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
-          <View style={{
-            backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-            padding: 24, paddingBottom: insets.bottom + 20,
-            shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
-          }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>{title}</Text>
-            {mode === 'save' && (
-              <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-                {t.settings.pinModal.description}
-              </Text>
-            )}
-            <Input
-              label={t.settings.pinModal.passwordLabel}
-              placeholder={t.settings.pinModal.passwordPlaceholder}
-              value={password}
-              onChangeText={setPassword}
-              isPassword
-              leftIcon="lock-closed-outline"
-            />
-            {mode === 'save' && (
-              <Input
-                label={t.settings.pinModal.newPinLabel}
-                placeholder={t.settings.pinModal.newPinPlaceholder}
-                value={newPin}
-                onChangeText={(v) => setNewPin(v.replace(/[^0-9]/g, '').slice(0, 8))}
-                keyboardType="number-pad"
-                secureTextEntry
-                leftIcon="keypad-outline"
-              />
-            )}
-            {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
-            <TouchableOpacity onPress={handleSubmit} disabled={saving}
-              style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === 'remove' ? c.ACCENT_RED : c.ACCENT_PURPLE, opacity: saving ? 0.7 : 1 }}>
-              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>
-                {saving ? t.common.actions.saving : mode === 'remove' ? t.settings.pinModal.removeButton : t.settings.pinModal.save}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onClose}
-              style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.pinModal.cancel}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
+    <View style={{
+      backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
+      padding: 24, paddingBottom: insets.bottom + 20,
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }}>
+      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+      <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>{title}</Text>
+      {mode === 'save' && (
+        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+          {t.settings.pinModal.description}
+        </Text>
+      )}
+      <Input
+        label={t.settings.pinModal.passwordLabel}
+        placeholder={t.settings.pinModal.passwordPlaceholder}
+        value={password}
+        onChangeText={setPassword}
+        isPassword
+        leftIcon="lock-closed-outline"
+      />
+      {mode === 'save' && (
+        <Input
+          label={t.settings.pinModal.newPinLabel}
+          placeholder={t.settings.pinModal.newPinPlaceholder}
+          value={newPin}
+          onChangeText={(v) => setNewPin(v.replace(/[^0-9]/g, '').slice(0, 8))}
+          keyboardType="number-pad"
+          secureTextEntry
+          leftIcon="keypad-outline"
+        />
+      )}
+      {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
+      <TouchableOpacity onPress={handleSubmit} disabled={saving}
+        style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === 'remove' ? c.ACCENT_RED : c.ACCENT_PURPLE, opacity: saving ? 0.7 : 1 }}>
+        <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>
+          {saving ? t.common.actions.saving : mode === 'remove' ? t.settings.pinModal.removeButton : t.settings.pinModal.save}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onClose}
+        style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+        <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.pinModal.cancel}</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -269,10 +253,21 @@ export default function SettingsScreen() {
   }
   const { user, logout, refreshUser } = useAuth();
   const versionInfo = getAppVersionInfo();
+  const { present, dismiss } = useBottomSheet();
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [plinModal, setPlinModal] = useState(false);
   const [languageModal, setLanguageModal] = useState(false);
-  const [pinModalMode, setPinModalMode] = useState<'save' | 'remove' | null>(null);
+
+  function openPinSheet(mode: 'save' | 'remove') {
+    present(
+      <PinSheetCard
+        mode={mode}
+        hasExisting={!!user?.hasTransactionPin}
+        onClose={dismiss}
+        onSaved={() => { refreshUser().catch(() => {}); }}
+      />
+    );
+  }
 
   // When "Conectar" has to send the user to Android Settings first, we remember
   // what they were trying to turn on so it finishes automatically the moment
@@ -355,14 +350,14 @@ export default function SettingsScreen() {
               icon="keypad-outline"
               label={user?.hasTransactionPin ? t.settings.security.pinRowLabelChange : t.settings.security.pinRowLabelSet}
               buttonLabel={user?.hasTransactionPin ? t.settings.security.pinRowButtonChange : t.settings.security.pinRowButtonConfigure}
-              onPress={() => setPinModalMode('save')}
+              onPress={() => openPinSheet('save')}
             />
             {user?.hasTransactionPin && (
               <ActionRow
                 icon="close-circle-outline"
                 label={t.settings.security.removePin}
                 buttonLabel={t.settings.security.removePinButton}
-                onPress={() => setPinModalMode('remove')}
+                onPress={() => openPinSheet('remove')}
               />
             )}
             {(user?.role === 'owner' || user?.role === 'supervisor') && (
@@ -522,15 +517,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* PIN de transacciones */}
-      <PinModal
-        visible={pinModalMode !== null}
-        mode={pinModalMode ?? 'save'}
-        hasExisting={!!user?.hasTransactionPin}
-        onClose={() => setPinModalMode(null)}
-        onSaved={() => { refreshUser().catch(() => {}); }}
-      />
 
       {/* Language picker */}
       <Modal visible={languageModal} transparent animationType="slide" onRequestClose={() => setLanguageModal(false)} statusBarTranslucent navigationBarTranslucent>

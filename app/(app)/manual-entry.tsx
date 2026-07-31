@@ -12,6 +12,7 @@ import { useTranslation } from '../../store/LocaleStore';
 import { ApiError } from '../../services/api';
 import { useTopInset } from '../../hooks/useTopInset';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useBottomSheet } from '../../store/BottomSheetStore';
 import Input from '../../components/ui/Input';
 import EmptyState from '../../components/ui/EmptyState';
 import StorePickerModal from '../../components/ui/StorePickerModal';
@@ -31,10 +32,21 @@ export default function ManualEntryScreen() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const keyboardHeight = useKeyboardHeight();
+  const { present, dismiss } = useBottomSheet();
 
   const selectedStoreName = stores.find(s => s.id === storeId)?.name ?? null;
+
+  function openStorePicker() {
+    present(
+      <StorePickerModal
+        onClose={dismiss}
+        options={stores.map(s => ({ id: s.id, name: s.name }))}
+        selectedId={storeId}
+        onSelect={(option) => setStoreId(option.id)}
+      />
+    );
+  }
 
   // The nav entry point is hidden from non-owners, but a stray deep link or
   // stale bookmark could still land here — the backend also rejects the
@@ -94,7 +106,7 @@ export default function ManualEntryScreen() {
         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontWeight: '600', marginBottom: 8, fontFamily: 'Inter_600SemiBold' }}>
           {t.manualEntry.storeLabel}
         </Text>
-        <TouchableOpacity onPress={() => setPickerOpen(true)}
+        <TouchableOpacity onPress={openStorePicker}
           style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginBottom: 16 }}>
           <Ionicons name="business-outline" size={18} color={c.TEXT_SECONDARY} style={{ marginRight: 10 }} />
           <Text style={{ flex: 1, color: selectedStoreName ? c.TEXT_PRIMARY : c.TEXT_SECONDARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
@@ -135,14 +147,6 @@ export default function ManualEntryScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
-
-      <StorePickerModal
-        visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        options={stores.map(s => ({ id: s.id, name: s.name }))}
-        selectedId={storeId}
-        onSelect={(option) => setStoreId(option.id)}
-      />
     </View>
   );
 }

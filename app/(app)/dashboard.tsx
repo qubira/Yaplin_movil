@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Modal, Pressable, StyleSheet, Dimensions, Image, Alert,
+  Modal, StyleSheet, Dimensions, Image, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +16,7 @@ import { useStores } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
 import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
+import { useBottomSheet } from '../../store/BottomSheetStore';
 import { ApiError } from '../../services/api';
 import TransactionItem from '../../components/ui/TransactionItem';
 import Avatar from '../../components/ui/Avatar';
@@ -145,6 +146,144 @@ function VerTodosRow({ txn, onPress, storeName }: { txn: Transaction; onPress: (
   );
 }
 
+function PeriodPickerSheet({ periodo, initial, hoy, onClose, onSelectDia, onSelectSemana, onSelectMes }: {
+  periodo: 'Día' | 'Semana' | 'Mes';
+  initial: Sel;
+  hoy: Date;
+  onClose: () => void;
+  onSelectDia: (y: number, m: number, d: number) => void;
+  onSelectSemana: (y: number, m: number, n: number, s: number, e: number) => void;
+  onSelectMes: (y: number, m: number) => void;
+}) {
+  const { c: Colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  const ABR = t.common.months.abbr;
+  const FULL = t.common.months.full;
+
+  const [navY, setNavY] = useState(periodo === 'Día' ? initial.diaY : periodo === 'Semana' ? initial.semY : initial.mesY);
+  const [navM, setNavM] = useState(periodo === 'Día' ? initial.diaM : periodo === 'Semana' ? initial.semM : initial.mesM);
+  const [tempDia, setTempDia] = useState(initial.diaD);
+
+  function prevMes() { if (navM === 0) { setNavM(11); setNavY(y => y - 1); } else setNavM(m => m - 1); }
+  function nextMes() { if (navM === 11) { setNavM(0); setNavY(y => y + 1); } else setNavM(m => m + 1); }
+
+  const semanas = weeksOf(navY, navM);
+  const totalDias = daysInMonth(navY, navM);
+
+  return (
+    <View style={{
+      backgroundColor: Colors.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
+      padding: 24, paddingBottom: insets.bottom + 24, borderTopWidth: 1, borderColor: Colors.BORDER,
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }}>
+      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+      <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>
+        {periodo === 'Día' ? t.dashboard.picker.selectDay : periodo === 'Semana' ? t.dashboard.picker.selectWeek : t.dashboard.picker.selectMonth}
+      </Text>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <TouchableOpacity onPress={periodo === 'Mes' ? () => setNavY(y => y - 1) : prevMes}
+          style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.BACKGROUND_CARD_2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.BORDER }}>
+          <Ionicons name="chevron-back" size={20} color={Colors.TEXT_PRIMARY} />
+        </TouchableOpacity>
+        <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 16, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+          {periodo === 'Mes' ? `${navY}` : `${FULL[navM]} ${navY}`}
+        </Text>
+        <TouchableOpacity onPress={periodo === 'Mes' ? () => setNavY(y => y + 1) : nextMes}
+          style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.BACKGROUND_CARD_2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.BORDER }}>
+          <Ionicons name="chevron-forward" size={20} color={Colors.TEXT_PRIMARY} />
+        </TouchableOpacity>
+      </View>
+
+      {periodo === 'Día' && (
+        <View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {Array.from({ length: totalDias }, (_, i) => i + 1).map(d => {
+              const isSel = tempDia === d;
+              const esHoy = d === hoy.getDate() && navM === hoy.getMonth() && navY === hoy.getFullYear();
+              return (
+                <TouchableOpacity key={d} onPress={() => setTempDia(d)}
+                  style={{
+                    width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: isSel ? Colors.ACCENT_PURPLE : Colors.BACKGROUND_CARD_2,
+                    borderWidth: 1, borderColor: isSel ? Colors.ACCENT_PURPLE : esHoy ? Colors.ACCENT_CYAN : Colors.BORDER,
+                  }}>
+                  <Text style={{
+                    color: isSel ? '#fff' : esHoy ? Colors.ACCENT_CYAN : Colors.TEXT_PRIMARY,
+                    fontSize: 14, fontFamily: isSel ? 'Inter_700Bold' : 'Inter_400Regular',
+                  }}>
+                    {d}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity
+            onPress={() => onSelectDia(navY, navM, tempDia)}
+            style={{ marginTop: 16, backgroundColor: Colors.ACCENT_PURPLE, borderRadius: 14, height: 50, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+              {t.dashboard.picker.viewDay(tempDia, FULL[navM], navY)}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {periodo === 'Semana' && (
+        <View style={{ gap: 8, marginTop: 8 }}>
+          {semanas.map(w => {
+            const selW = initial.semN === w.n && initial.semM === navM && initial.semY === navY;
+            return (
+              <TouchableOpacity key={w.n}
+                onPress={() => onSelectSemana(navY, navM, w.n, w.s, w.e)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1,
+                  backgroundColor: selW ? Colors.ACCENT_PURPLE : Colors.BACKGROUND_CARD_2,
+                  borderColor: selW ? Colors.ACCENT_PURPLE : Colors.BORDER,
+                }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: selW ? '#fff' : Colors.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                    {t.dashboard.picker.weekN(w.n)}
+                  </Text>
+                  <Text style={{ color: selW ? 'rgba(255,255,255,0.75)' : Colors.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 }}>
+                    {w.s} {ABR[navM]} – {w.e} {ABR[navM]} {navY}
+                  </Text>
+                </View>
+                {selW && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {periodo === 'Mes' && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+          {FULL.map((_, i) => {
+            const isSel = initial.mesM === i && initial.mesY === navY;
+            const esHoy = i === hoy.getMonth() && navY === hoy.getFullYear();
+            return (
+              <TouchableOpacity key={i}
+                onPress={() => onSelectMes(navY, i)}
+                style={{
+                  width: MONTH_CELL_W, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: isSel ? Colors.ACCENT_PURPLE : Colors.BACKGROUND_CARD_2,
+                  borderWidth: 1, borderColor: isSel ? Colors.ACCENT_PURPLE : esHoy ? Colors.ACCENT_CYAN : Colors.BORDER,
+                }}>
+                <Text style={{
+                  color: isSel ? '#fff' : esHoy ? Colors.ACCENT_CYAN : Colors.TEXT_PRIMARY,
+                  fontSize: 14, fontFamily: isSel ? 'Inter_700Bold' : 'Inter_400Regular',
+                }}>
+                  {ABR[i]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const { c: Colors, toggle } = useTheme();
   const insets = useSafeAreaInsets();
@@ -161,11 +300,11 @@ export default function DashboardScreen() {
   const hoy = new Date();
 
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
-  const [pickerVisible, setPickerVisible] = useState(false);
   const [verTodos, setVerTodos]       = useState(false);
   const { transactions: allTxns, transactionsLoading, routeTransaction, refreshTransactions } = useTransactions();
   const { stores } = useStores();
   const { user } = useAuth();
+  const { present, dismiss } = useBottomSheet();
 
   function storeNameFor(storeId: string | null): string | null {
     if (storeId === null) return null;
@@ -180,10 +319,6 @@ export default function DashboardScreen() {
       Alert.alert('', e instanceof ApiError ? e.message : t.general.loadError);
     }
   }
-
-  const [navY, setNavY]     = useState(hoy.getFullYear());
-  const [navM, setNavM]     = useState(hoy.getMonth());
-  const [tempDia, setTempDia] = useState(hoy.getDate());
 
   const [sel, setSel] = useState<Sel>({
     diaY: hoy.getFullYear(), diaM: hoy.getMonth(), diaD: hoy.getDate(),
@@ -208,18 +343,20 @@ export default function DashboardScreen() {
   function abrirPicker(p: Period) {
     if (p === 'Hoy') { setPeriodo('Hoy'); return; }
     setPeriodo(p);
-    if (p === 'Día')         { setNavY(sel.diaY); setNavM(sel.diaM); setTempDia(sel.diaD); }
-    else if (p === 'Semana') { setNavY(sel.semY); setNavM(sel.semM); }
-    else                     { setNavY(sel.mesY); }
-    setPickerVisible(true);
+    present(
+      <PeriodPickerSheet
+        periodo={p}
+        initial={sel}
+        hoy={hoy}
+        onClose={dismiss}
+        onSelectDia={(y, m, d) => { setSel(v => ({ ...v, diaY: y, diaM: m, diaD: d })); dismiss(); }}
+        onSelectSemana={(y, m, n, s, e) => { setSel(v => ({ ...v, semY: y, semM: m, semN: n, semS: s, semE: e })); dismiss(); }}
+        onSelectMes={(y, m) => { setSel(v => ({ ...v, mesY: y, mesM: m })); dismiss(); }}
+      />
+    );
   }
 
-  function prevMes() { if (navM === 0) { setNavM(11); setNavY(y => y - 1); } else setNavM(m => m - 1); }
-  function nextMes() { if (navM === 11) { setNavM(0); setNavY(y => y + 1); } else setNavM(m => m + 1); }
-
-  const semanas   = weeksOf(navY, navM);
-  const totalDias = daysInMonth(navY, navM);
-  const label     = labelPeriodo(periodo, sel, hoy, ABR, FULL, t.dashboard.weekAbbr);
+  const label = labelPeriodo(periodo, sel, hoy, ABR, FULL, t.dashboard.weekAbbr);
 
   function goToDetail(txnId: string) {
     setVerTodos(false);
@@ -487,119 +624,6 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
-      {/* ── Picker modal ── */}
-      <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={() => setPickerVisible(false)} statusBarTranslucent navigationBarTranslucent>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(6,6,10,0.82)' }} onPress={() => setPickerVisible(false)} />
-        <View style={{
-          backgroundColor: Colors.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-          padding: 24, paddingBottom: insets.bottom + 24, borderTopWidth: 1, borderColor: Colors.BORDER,
-          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
-        }}>
-          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-          <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>
-            {periodo === 'Día' ? t.dashboard.picker.selectDay : periodo === 'Semana' ? t.dashboard.picker.selectWeek : t.dashboard.picker.selectMonth}
-          </Text>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <TouchableOpacity onPress={periodo === 'Mes' ? () => setNavY(y => y - 1) : prevMes}
-              style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.BACKGROUND_CARD_2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.BORDER }}>
-              <Ionicons name="chevron-back" size={20} color={Colors.TEXT_PRIMARY} />
-            </TouchableOpacity>
-            <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 16, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-              {periodo === 'Mes' ? `${navY}` : `${FULL[navM]} ${navY}`}
-            </Text>
-            <TouchableOpacity onPress={periodo === 'Mes' ? () => setNavY(y => y + 1) : nextMes}
-              style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.BACKGROUND_CARD_2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.BORDER }}>
-              <Ionicons name="chevron-forward" size={20} color={Colors.TEXT_PRIMARY} />
-            </TouchableOpacity>
-          </View>
-
-          {periodo === 'Día' && (
-            <View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                {Array.from({ length: totalDias }, (_, i) => i + 1).map(d => {
-                  const isSel = tempDia === d;
-                  const esHoy = d === hoy.getDate() && navM === hoy.getMonth() && navY === hoy.getFullYear();
-                  return (
-                    <TouchableOpacity key={d} onPress={() => setTempDia(d)}
-                      style={{
-                        width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: isSel ? Colors.ACCENT_PURPLE : Colors.BACKGROUND_CARD_2,
-                        borderWidth: 1, borderColor: isSel ? Colors.ACCENT_PURPLE : esHoy ? Colors.ACCENT_CYAN : Colors.BORDER,
-                      }}>
-                      <Text style={{
-                        color: isSel ? '#fff' : esHoy ? Colors.ACCENT_CYAN : Colors.TEXT_PRIMARY,
-                        fontSize: 14, fontFamily: isSel ? 'Inter_700Bold' : 'Inter_400Regular',
-                      }}>
-                        {d}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <TouchableOpacity
-                onPress={() => { setSel(v => ({ ...v, diaY: navY, diaM: navM, diaD: tempDia })); setPickerVisible(false); }}
-                style={{ marginTop: 16, backgroundColor: Colors.ACCENT_PURPLE, borderRadius: 14, height: 50, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                  {t.dashboard.picker.viewDay(tempDia, FULL[navM], navY)}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {periodo === 'Semana' && (
-            <View style={{ gap: 8, marginTop: 8 }}>
-              {semanas.map(w => {
-                const selW = sel.semN === w.n && sel.semM === navM && sel.semY === navY;
-                return (
-                  <TouchableOpacity key={w.n}
-                    onPress={() => { setSel(v => ({ ...v, semY: navY, semM: navM, semN: w.n, semS: w.s, semE: w.e })); setPickerVisible(false); }}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1,
-                      backgroundColor: selW ? Colors.ACCENT_PURPLE : Colors.BACKGROUND_CARD_2,
-                      borderColor: selW ? Colors.ACCENT_PURPLE : Colors.BORDER,
-                    }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: selW ? '#fff' : Colors.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                        {t.dashboard.picker.weekN(w.n)}
-                      </Text>
-                      <Text style={{ color: selW ? 'rgba(255,255,255,0.75)' : Colors.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 }}>
-                        {w.s} {ABR[navM]} – {w.e} {ABR[navM]} {navY}
-                      </Text>
-                    </View>
-                    {selW && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          {periodo === 'Mes' && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
-              {FULL.map((_, i) => {
-                const isSel = sel.mesM === i && sel.mesY === navY;
-                const esHoy = i === hoy.getMonth() && navY === hoy.getFullYear();
-                return (
-                  <TouchableOpacity key={i}
-                    onPress={() => { setSel(v => ({ ...v, mesY: navY, mesM: i })); setPickerVisible(false); }}
-                    style={{
-                      width: MONTH_CELL_W, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: isSel ? Colors.ACCENT_PURPLE : Colors.BACKGROUND_CARD_2,
-                      borderWidth: 1, borderColor: isSel ? Colors.ACCENT_PURPLE : esHoy ? Colors.ACCENT_CYAN : Colors.BORDER,
-                    }}>
-                    <Text style={{
-                      color: isSel ? '#fff' : esHoy ? Colors.ACCENT_CYAN : Colors.TEXT_PRIMARY,
-                      fontSize: 14, fontFamily: isSel ? 'Inter_700Bold' : 'Inter_400Regular',
-                    }}>
-                      {ABR[i]}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-        </View>
-      </Modal>
     </View>
   );
 }

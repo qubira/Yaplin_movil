@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,7 @@ import { useTeam, useStores } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
 import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
-import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useBottomSheet } from '../../store/BottomSheetStore';
 import { ApiError } from '../../services/api';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
@@ -120,8 +120,7 @@ interface MemberFormData {
   password?: string;
 }
 
-function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, title, canEditRole = true, canEditStore = true }: {
-  visible: boolean;
+function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canEditRole = true, canEditStore = true }: {
   onClose: () => void;
   initial: TeamMember | null;
   storeOptions: { id: string; name: string }[];
@@ -135,27 +134,28 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
   const t = useTranslation();
   const ROLE_CONFIG = roleConfig(t);
   const isEdit = !!initial;
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState(initial?.name ?? '');
+  const [email, setEmail] = useState(initial?.email ?? '');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<TeamMember['role']>('cajero');
-  const [storeId, setStoreId] = useState<string>('all');
+  const [role, setRole] = useState<TeamMember['role']>(initial?.role ?? 'cajero');
+  const [storeId, setStoreId] = useState<string>(initial?.storeId ?? 'all');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [storePickerOpen, setStorePickerOpen] = useState(false);
-  const keyboardHeight = useKeyboardHeight();
-
-  useEffect(() => {
-    if (!visible) return;
-    setName(initial?.name ?? '');
-    setEmail(initial?.email ?? '');
-    setPassword('');
-    setRole(initial?.role ?? 'cajero');
-    setStoreId(initial?.storeId ?? 'all');
-    setError('');
-  }, [visible, initial]);
+  const { present, dismiss } = useBottomSheet();
 
   const canSubmit = name.trim() && (isEdit || password.length >= 6);
+
+  function openStorePicker() {
+    present(
+      <StorePickerModal
+        onClose={dismiss}
+        title={t.team.storeAssignedLabel}
+        options={[{ id: 'all', name: t.team.allStores, pinned: true }, ...storeOptions]}
+        selectedId={storeId}
+        onSelect={(option) => setStoreId(option.id ?? 'all')}
+      />
+    );
+  }
 
   async function handleSubmit() {
     if (!canSubmit || saving) return;
@@ -172,99 +172,77 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
   }
 
   return (
-    <>
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      {/* The dark overlay stays a plain flex:1 View (always covers the full
-          screen) — only the sheet card itself moves for the keyboard, via
-          useKeyboardHeight()'s tracked height (see hooks/useKeyboardHeight.ts
-          for why this replaced KeyboardAvoidingView: it left a residual gap
-          right after the keyboard was dismissed). */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
-        <View style={[s.addSheet, {
-          backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
-          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
-        }]}>
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <View style={[s.sheetHandle, { backgroundColor: c.BORDER }]} />
-            <Text style={[s.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
-            <View style={{ gap: 4 }}>
-              <Input label={t.common.form.name} placeholder={t.team.form.namePlaceholder} value={name} onChangeText={setName} leftIcon="person-outline" />
-              <View style={{ height: 8 }} />
-              <Input label={t.team.form.emailLabel} placeholder={t.team.form.emailPlaceholder} value={email} onChangeText={setEmail} keyboardType="email-address" leftIcon="mail-outline" />
-              <View style={{ height: 8 }} />
-              <Input
-                label={isEdit ? t.team.form.passwordLabelEdit : t.team.form.passwordLabelNew}
-                placeholder={t.team.form.passwordPlaceholder}
-                value={password}
-                onChangeText={setPassword}
-                isPassword
-                leftIcon="lock-closed-outline"
-              />
+    <View style={[s.addSheet, {
+      backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }]}>
+      <ScrollView keyboardShouldPersistTaps="handled">
+        <View style={[s.sheetHandle, { backgroundColor: c.BORDER }]} />
+        <Text style={[s.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
+        <View style={{ gap: 4 }}>
+          <Input label={t.common.form.name} placeholder={t.team.form.namePlaceholder} value={name} onChangeText={setName} leftIcon="person-outline" />
+          <View style={{ height: 8 }} />
+          <Input label={t.team.form.emailLabel} placeholder={t.team.form.emailPlaceholder} value={email} onChangeText={setEmail} keyboardType="email-address" leftIcon="mail-outline" />
+          <View style={{ height: 8 }} />
+          <Input
+            label={isEdit ? t.team.form.passwordLabelEdit : t.team.form.passwordLabelNew}
+            placeholder={t.team.form.passwordPlaceholder}
+            value={password}
+            onChangeText={setPassword}
+            isPassword
+            leftIcon="lock-closed-outline"
+          />
+        </View>
+
+        {canEditRole && (
+          <>
+            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.form.roleSectionTitle}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {(['owner', 'supervisor', 'cajero'] as TeamMember['role'][]).map(r => {
+                const active = role === r;
+                const rc = ROLE_CONFIG[r];
+                return (
+                  <TouchableOpacity key={r} onPress={() => setRole(r)} activeOpacity={0.8}
+                    style={{ flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1, backgroundColor: active ? `${c.ACCENT_PURPLE}18` : c.BACKGROUND_CARD_2, borderColor: active ? `${c.ACCENT_PURPLE}55` : c.BORDER }}>
+                    <Ionicons name={rc.icon} size={18} color={active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY} />
+                    <Text style={{ color: active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
+                      {rc.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+          </>
+        )}
 
-            {canEditRole && (
-              <>
-                <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.form.roleSectionTitle}</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {(['owner', 'supervisor', 'cajero'] as TeamMember['role'][]).map(r => {
-                    const active = role === r;
-                    const rc = ROLE_CONFIG[r];
-                    return (
-                      <TouchableOpacity key={r} onPress={() => setRole(r)} activeOpacity={0.8}
-                        style={{ flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1, backgroundColor: active ? `${c.ACCENT_PURPLE}18` : c.BACKGROUND_CARD_2, borderColor: active ? `${c.ACCENT_PURPLE}55` : c.BORDER }}>
-                        <Ionicons name={rc.icon} size={18} color={active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY} />
-                        <Text style={{ color: active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
-                          {rc.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </>
-            )}
-
-            {canEditStore && (
-              <>
-                <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
-                <TouchableOpacity onPress={() => setStorePickerOpen(true)} activeOpacity={0.8}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }}>
-                  <Ionicons name="business-outline" size={18} color={c.TEXT_SECONDARY} style={{ marginRight: 10 }} />
-                  <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                    {[{ id: 'all', name: t.team.allStores }, ...storeOptions].find(o => o.id === storeId)?.name ?? t.team.allStores}
-                  </Text>
-                  <Ionicons name="chevron-down" size={18} color={c.TEXT_SECONDARY} />
-                </TouchableOpacity>
-              </>
-            )}
-
-            {!!error && (
-              <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 16 }}>{error}</Text>
-            )}
-
-            <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit || saving}
-              style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: canSubmit ? c.ACCENT_PURPLE : c.BORDER, opacity: saving ? 0.7 : 1 }}>
-              <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{saving ? t.common.actions.saving : t.common.actions.save}</Text>
+        {canEditStore && (
+          <>
+            <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
+            <TouchableOpacity onPress={openStorePicker} activeOpacity={0.8}
+              style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }}>
+              <Ionicons name="business-outline" size={18} color={c.TEXT_SECONDARY} style={{ marginRight: 10 }} />
+              <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                {[{ id: 'all', name: t.team.allStores }, ...storeOptions].find(o => o.id === storeId)?.name ?? t.team.allStores}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color={c.TEXT_SECONDARY} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose}
-              style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-        </View>
-      </View>
-    </Modal>
+          </>
+        )}
 
-    <StorePickerModal
-      visible={storePickerOpen}
-      onClose={() => setStorePickerOpen(false)}
-      title={t.team.storeAssignedLabel}
-      options={[{ id: 'all', name: t.team.allStores, pinned: true }, ...storeOptions]}
-      selectedId={storeId}
-      onSelect={(option) => setStoreId(option.id ?? 'all')}
-    />
-    </>
+        {!!error && (
+          <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 16 }}>{error}</Text>
+        )}
+
+        <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit || saving}
+          style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: canSubmit ? c.ACCENT_PURPLE : c.BORDER, opacity: saving ? 0.7 : 1 }}>
+          <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{saving ? t.common.actions.saving : t.common.actions.save}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onClose}
+          style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+          <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -278,14 +256,40 @@ export default function TeamScreen() {
   const { team, teamLoading, refreshTeam, addMember, updateMember, removeMember } = useTeam();
   const { stores } = useStores();
   const { user } = useAuth();
+  const { present, dismiss } = useBottomSheet();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [addModal, setAddModal] = useState(false);
-  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   const selected = team.find(m => m.id === selectedId) ?? null;
   const active = team.filter(m => m.active).length;
   const selectedEditPerms = selected ? memberEditPermissions(user?.role, user?.id, selected) : null;
-  const editingPerms = editingMember ? memberEditPermissions(user?.role, user?.id, editingMember) : null;
+
+  function openAddSheet() {
+    present(
+      <MemberFormSheet
+        onClose={dismiss}
+        initial={null}
+        storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
+        title={t.team.addMemberTitle}
+        canEditRole={user?.role === 'owner'}
+        onSubmit={(data) => addMember({ ...data, password: data.password ?? '', active: true })}
+      />
+    );
+  }
+
+  function openEditSheet(member: TeamMember) {
+    const editingPerms = memberEditPermissions(user?.role, user?.id, member);
+    present(
+      <MemberFormSheet
+        onClose={dismiss}
+        initial={member}
+        storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
+        title={t.team.editMemberTitle}
+        canEditRole={editingPerms.canEditRole}
+        canEditStore={editingPerms.canEditStore}
+        onSubmit={(data) => updateMember(member.id, data)}
+      />
+    );
+  }
 
   function storeNameFor(storeId: string) {
     if (storeId === 'all') return t.team.allStores;
@@ -316,7 +320,7 @@ export default function TeamScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <RefreshButton onRefresh={refreshTeam} />
           {(user?.role === 'owner' || user?.role === 'supervisor') && (
-            <TouchableOpacity onPress={() => setAddModal(true)}
+            <TouchableOpacity onPress={openAddSheet}
               style={[s.addBtn, { backgroundColor: c.ACCENT_PURPLE }]}>
               <Ionicons name="person-add-outline" size={18} color="#fff" />
             </TouchableOpacity>
@@ -392,7 +396,7 @@ export default function TeamScreen() {
               </TouchableOpacity>
               <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY, marginLeft: 14, flex: 1 }]}>{t.team.memberDetailTitle}</Text>
               {selectedEditPerms?.canEdit && (
-                <TouchableOpacity onPress={() => setEditingMember(selected)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
+                <TouchableOpacity onPress={() => openEditSheet(selected)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
                   <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
                 </TouchableOpacity>
               )}
@@ -458,30 +462,6 @@ export default function TeamScreen() {
         )}
       </Modal>
 
-      {/* Add member — owner can create any role; a supervisor can only ever
-          create a cajero, so the role picker is hidden and stays on the
-          'cajero' default (mirrors the backend's POST / restriction). */}
-      <MemberFormSheet
-        visible={addModal}
-        onClose={() => setAddModal(false)}
-        initial={null}
-        storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
-        title={t.team.addMemberTitle}
-        canEditRole={user?.role === 'owner'}
-        onSubmit={(data) => addMember({ ...data, password: data.password ?? '', active: true })}
-      />
-
-      {/* Edit member */}
-      <MemberFormSheet
-        visible={!!editingMember}
-        onClose={() => setEditingMember(null)}
-        initial={editingMember}
-        storeOptions={stores.map(st => ({ id: st.id, name: st.name }))}
-        title={t.team.editMemberTitle}
-        canEditRole={editingPerms?.canEditRole ?? true}
-        canEditStore={editingPerms?.canEditStore ?? true}
-        onSubmit={(data) => editingMember ? updateMember(editingMember.id, data) : Promise.resolve()}
-      />
     </View>
   );
 }

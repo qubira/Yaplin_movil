@@ -20,7 +20,7 @@ import { ApiError } from '../../../services/api';
 import { dictionaries } from '../../../translations';
 import Avatar from '../../../components/ui/Avatar';
 import Input from '../../../components/ui/Input';
-import { useKeyboardHeight } from '../../../hooks/useKeyboardHeight';
+import { useBottomSheet } from '../../../store/BottomSheetStore';
 
 const SUPPORT_EMAIL = 'qubirasac@gmail.com';
 
@@ -247,7 +247,6 @@ function TimelineRow({ event, isLast }: { event: TransactionEvent; isLast: boole
 }
 
 interface ActionModalShellProps {
-  visible: boolean;
   title: string;
   onClose: () => void;
   onSubmit: () => void;
@@ -258,45 +257,160 @@ interface ActionModalShellProps {
   children: ReactNode;
 }
 
-function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, submitting, error, submitColor, children }: ActionModalShellProps) {
+function ActionModalShell({ title, onClose, onSubmit, submitLabel, submitting, error, submitColor, children }: ActionModalShellProps) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const t = useTranslation();
-  const keyboardHeight = useKeyboardHeight();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      {/* The dark overlay stays a plain flex:1 View (always covers the full
-          screen) — only the sheet card itself moves for the keyboard, via
-          useKeyboardHeight()'s tracked height (see hooks/useKeyboardHeight.ts
-          for why this replaced KeyboardAvoidingView: it left a residual gap
-          right after the keyboard was dismissed). */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
-        <View style={{
-          backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-          padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%',
-          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
-        }}>
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>{title}</Text>
-            {children}
-            {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
-            <TouchableOpacity onPress={onSubmit} disabled={submitting}
-              style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: submitColor ?? c.ACCENT_PURPLE, opacity: submitting ? 0.7 : 1 }}>
-              {submitting ? <ActivityIndicator color="#fff" /> : (
-                <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{submitLabel}</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} disabled={submitting}
-              style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-        </View>
+    <View style={{
+      backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
+      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%',
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }}>
+      <ScrollView keyboardShouldPersistTaps="handled">
+        <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+        <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>{title}</Text>
+        {children}
+        {!!error && <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 8 }}>{error}</Text>}
+        <TouchableOpacity onPress={onSubmit} disabled={submitting}
+          style={{ marginTop: 8, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: submitColor ?? c.ACCENT_PURPLE, opacity: submitting ? 0.7 : 1 }}>
+          {submitting ? <ActivityIndicator color="#fff" /> : (
+            <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{submitLabel}</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onClose} disabled={submitting}
+          style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+          <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+}
+
+function MoveSheetContent({ moveOptions, onClose, onMove }: {
+  moveOptions: { id: string | null; name: string }[];
+  onClose: () => void;
+  onMove: (targetId: string | null) => Promise<void>;
+}) {
+  const { c } = useTheme();
+  const t = useTranslation();
+  const [moveTarget, setMoveTarget] = useState<{ id: string | null; name: string } | null>(null);
+  const [moveSearch, setMoveSearch] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    if (!moveTarget) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await onMove(moveTarget.id);
+      onClose();
+    } catch (e) {
+      setError(apiErrorMessage(e, t));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ActionModalShell title={t.transaction.moveModal.title} onClose={onClose} onSubmit={handleSubmit}
+      submitLabel={t.transaction.moveModal.submit} submitting={submitting} error={error}>
+      <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+        {t.transaction.moveModal.description}
+      </Text>
+      {moveOptions.length > 5 && (
+        <>
+          <Input
+            placeholder={t.common.storePicker.searchPlaceholder}
+            value={moveSearch}
+            onChangeText={setMoveSearch}
+            leftIcon="search-outline"
+          />
+          <View style={{ height: 8 }} />
+        </>
+      )}
+      <View style={{ gap: 8, marginBottom: 8 }}>
+        {moveOptions
+          .filter(option => {
+            if (option.id === null) return true;
+            const term = moveSearch.trim().toLowerCase();
+            return !term || option.name.toLowerCase().includes(term);
+          })
+          .map(option => {
+            const active = moveTarget?.id === option.id;
+            return (
+              <TouchableOpacity key={option.id ?? '__general__'} onPress={() => setMoveTarget(option)}
+                style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
+                <Text style={{ flex: 1, color: active ? '#fff' : c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                  {option.id === null ? t.transaction.moveModal.generalOption : option.name}
+                </Text>
+                {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+              </TouchableOpacity>
+            );
+          })}
       </View>
-    </Modal>
+    </ActionModalShell>
+  );
+}
+
+function CorrectSheetContent({ transaction, hasPin, onClose, onCorrect }: {
+  transaction: Transaction;
+  hasPin: boolean;
+  onClose: () => void;
+  onCorrect: (delta: number, reason: string, confirm: ConfirmationInput) => Promise<void>;
+}) {
+  const t = useTranslation();
+  const [newAmountText, setNewAmountText] = useState(String(transaction.amount));
+  const [correctReason, setCorrectReason] = useState('');
+  const [confirmValue, setConfirmValue] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    const newAmount = parseFloat(newAmountText.replace(',', '.'));
+    if (!Number.isFinite(newAmount) || newAmount === transaction.amount) {
+      setError(t.transaction.correctModal.invalidAmount);
+      return;
+    }
+    if (!correctReason.trim()) {
+      setError(t.transaction.correctModal.reasonRequired);
+      return;
+    }
+    const delta = Math.round((newAmount - transaction.amount) * 100) / 100;
+    const confirm: ConfirmationInput = hasPin ? { confirmPin: confirmValue } : { confirmText: confirmValue };
+    setSubmitting(true);
+    setError('');
+    try {
+      await onCorrect(delta, correctReason.trim(), confirm);
+      onClose();
+    } catch (e) {
+      setError(apiErrorMessage(e, t));
+      if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ActionModalShell title={t.transaction.correctModal.title} onClose={onClose} onSubmit={handleSubmit}
+      submitLabel={t.transaction.correctModal.submit} submitting={submitting} error={error}>
+      <Input
+        label={t.transaction.correctModal.newAmountLabel}
+        value={newAmountText}
+        onChangeText={setNewAmountText}
+        keyboardType="decimal-pad"
+        leftIcon="cash-outline"
+      />
+      <Input
+        label={t.transaction.correctModal.reasonLabel}
+        placeholder={t.transaction.correctModal.reasonPlaceholder}
+        value={correctReason}
+        onChangeText={setCorrectReason}
+        leftIcon="document-text-outline"
+      />
+      <ConfirmField hasPin={hasPin} value={confirmValue} onChangeText={setConfirmValue} />
+    </ActionModalShell>
   );
 }
 
@@ -361,14 +475,7 @@ export default function TransactionDetailScreen() {
   // ── Owner/routing actions ── anular ya no existe para ningún rol; un pago
   // capturado es inmutable en su estado activo/anulado (queda solo mover y
   // corregir monto, ambas eventos, nunca una eliminación).
-  const [actionModal, setActionModal] = useState<'move' | 'correct' | null>(null);
-  const [actionError, setActionError] = useState('');
-  const [actionSubmitting, setActionSubmitting] = useState(false);
-  const [moveTarget, setMoveTarget] = useState<{ id: string | null; name: string } | null>(null);
-  const [moveSearch, setMoveSearch] = useState('');
-  const [newAmountText, setNewAmountText] = useState('');
-  const [correctReason, setCorrectReason] = useState('');
-  const [confirmValue, setConfirmValue] = useState('');
+  const { present, dismiss } = useBottomSheet();
 
   const history = useMemo(() =>
     transaction
@@ -446,56 +553,43 @@ export default function TransactionDetailScreen() {
     setRefreshingDetail(false);
   }
 
-  function openActionModal(kind: 'move' | 'correct') {
-    setActionError('');
-    setConfirmValue('');
-    if (kind === 'correct' && transaction) { setNewAmountText(String(transaction.amount)); setCorrectReason(''); }
-    if (kind === 'move') { setMoveTarget(null); setMoveSearch(''); }
-    setActionModal(kind);
-  }
-
-  async function submitMove() {
-    if (!transaction || !moveTarget) return;
-    setActionSubmitting(true);
-    setActionError('');
-    try {
-      await routeTransaction(transaction.id, moveTarget.id, transaction.version);
-      setActionModal(null);
-      loadEvents();
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
-      setActionError(apiErrorMessage(e, t));
-    } finally {
-      setActionSubmitting(false);
-    }
-  }
-
-  async function submitCorrect() {
+  function openMoveSheet() {
     if (!transaction) return;
-    const newAmount = parseFloat(newAmountText.replace(',', '.'));
-    if (!Number.isFinite(newAmount) || newAmount === transaction.amount) {
-      setActionError(t.transaction.correctModal.invalidAmount);
-      return;
-    }
-    if (!correctReason.trim()) {
-      setActionError(t.transaction.correctModal.reasonRequired);
-      return;
-    }
-    const delta = Math.round((newAmount - transaction.amount) * 100) / 100;
-    const confirm: ConfirmationInput = user?.hasTransactionPin ? { confirmPin: confirmValue } : { confirmText: confirmValue };
-    setActionSubmitting(true);
-    setActionError('');
-    try {
-      await correctAmount(transaction.id, delta, correctReason.trim(), transaction.version, confirm);
-      setActionModal(null);
-      loadEvents();
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
-      if (e instanceof ApiError && e.code === 'CONFIRMATION_INVALID') setConfirmValue('');
-      setActionError(apiErrorMessage(e, t));
-    } finally {
-      setActionSubmitting(false);
-    }
+    present(
+      <MoveSheetContent
+        moveOptions={moveOptions}
+        onClose={dismiss}
+        onMove={async (targetId) => {
+          try {
+            await routeTransaction(transaction.id, targetId, transaction.version);
+            loadEvents();
+          } catch (e) {
+            if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
+            throw e;
+          }
+        }}
+      />
+    );
+  }
+
+  function openCorrectSheet() {
+    if (!transaction) return;
+    present(
+      <CorrectSheetContent
+        transaction={transaction}
+        hasPin={!!user?.hasTransactionPin}
+        onClose={dismiss}
+        onCorrect={async (delta, reason, confirm) => {
+          try {
+            await correctAmount(transaction.id, delta, reason, transaction.version, confirm);
+            loadEvents();
+          } catch (e) {
+            if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') await refreshCurrentTransaction();
+            throw e;
+          }
+        }}
+      />
+    );
   }
 
   if (!transaction) {
@@ -660,14 +754,14 @@ export default function TransactionDetailScreen() {
           <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               {canMove && (
-                <TouchableOpacity onPress={() => openActionModal('move')} activeOpacity={0.85}
+                <TouchableOpacity onPress={openMoveSheet} activeOpacity={0.85}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.ACCENT_CYAN}18`, borderWidth: 1, borderColor: `${c.ACCENT_CYAN}44` }}>
                   <Ionicons name="swap-horizontal-outline" size={16} color={c.ACCENT_CYAN} />
                   <Text style={{ color: c.ACCENT_CYAN, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.move}</Text>
                 </TouchableOpacity>
               )}
               {canCorrect && (
-                <TouchableOpacity onPress={() => openActionModal('correct')} activeOpacity={0.85}
+                <TouchableOpacity onPress={openCorrectSheet} activeOpacity={0.85}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, height: 46, borderRadius: 14, backgroundColor: `${c.ACCENT_PURPLE}18`, borderWidth: 1, borderColor: `${c.ACCENT_PURPLE}44` }}>
                   <Ionicons name="pencil-outline" size={16} color={c.ACCENT_PURPLE} />
                   <Text style={{ color: c.ACCENT_PURPLE, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{t.transaction.actions.correctAmount}</Text>
@@ -899,79 +993,6 @@ export default function TransactionDetailScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* ══ MOVER PAGO ══ */}
-      <ActionModalShell
-        visible={actionModal === 'move'}
-        title={t.transaction.moveModal.title}
-        onClose={() => setActionModal(null)}
-        onSubmit={submitMove}
-        submitLabel={t.transaction.moveModal.submit}
-        submitting={actionSubmitting}
-        error={actionError}
-      >
-        <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-          {t.transaction.moveModal.description}
-        </Text>
-        {moveOptions.length > 5 && (
-          <>
-            <Input
-              placeholder={t.common.storePicker.searchPlaceholder}
-              value={moveSearch}
-              onChangeText={setMoveSearch}
-              leftIcon="search-outline"
-            />
-            <View style={{ height: 8 }} />
-          </>
-        )}
-        <View style={{ gap: 8, marginBottom: 8 }}>
-          {moveOptions
-            .filter(option => {
-              if (option.id === null) return true;
-              const term = moveSearch.trim().toLowerCase();
-              return !term || option.name.toLowerCase().includes(term);
-            })
-            .map(option => {
-              const active = moveTarget?.id === option.id;
-              return (
-                <TouchableOpacity key={option.id ?? '__general__'} onPress={() => setMoveTarget(option)}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
-                  <Text style={{ flex: 1, color: active ? '#fff' : c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                    {option.id === null ? t.transaction.moveModal.generalOption : option.name}
-                  </Text>
-                  {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
-                </TouchableOpacity>
-              );
-            })}
-        </View>
-      </ActionModalShell>
-
-      {/* ══ CORREGIR MONTO ══ */}
-      <ActionModalShell
-        visible={actionModal === 'correct'}
-        title={t.transaction.correctModal.title}
-        onClose={() => setActionModal(null)}
-        onSubmit={submitCorrect}
-        submitLabel={t.transaction.correctModal.submit}
-        submitting={actionSubmitting}
-        error={actionError}
-      >
-        <Input
-          label={t.transaction.correctModal.newAmountLabel}
-          value={newAmountText}
-          onChangeText={setNewAmountText}
-          keyboardType="decimal-pad"
-          leftIcon="cash-outline"
-        />
-        <Input
-          label={t.transaction.correctModal.reasonLabel}
-          placeholder={t.transaction.correctModal.reasonPlaceholder}
-          value={correctReason}
-          onChangeText={setCorrectReason}
-          leftIcon="document-text-outline"
-        />
-        <ConfirmField hasPin={!!user?.hasTransactionPin} value={confirmValue} onChangeText={setConfirmValue} />
-      </ActionModalShell>
 
     </View>
   );

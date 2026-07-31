@@ -19,6 +19,7 @@ import BrandLoader from '../../components/ui/BrandLoader';
 import EmptyState from '../../components/ui/EmptyState';
 import RefreshButton from '../../components/ui/RefreshButton';
 import StorePickerModal from '../../components/ui/StorePickerModal';
+import { useBottomSheet } from '../../store/BottomSheetStore';
 
 // A manually-entered payment always has a real storeId (POST
 // /transactions/manual requires one), so it can never actually appear in
@@ -141,7 +142,7 @@ export default function GeneralScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [pickerTxn, setPickerTxn] = useState<Transaction | null>(null);
+  const { present, dismiss } = useBottomSheet();
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -169,12 +170,23 @@ export default function GeneralScreen() {
     try {
       await routeTransaction(txn.id, toStoreId, txn.version);
       setItems(prev => prev.filter(x => x.id !== txn.id));
-      setPickerTxn(null);
+      dismiss();
     } catch (e) {
       Alert.alert('', e instanceof ApiError ? e.message : t.general.loadError);
     } finally {
       setAssigningId(null);
     }
+  }
+
+  function openPicker(txn: Transaction) {
+    present(
+      <StorePickerModal
+        onClose={dismiss}
+        title={t.general.pickStoreTitle}
+        options={stores.map(s => ({ id: s.id, name: s.name }))}
+        onSelect={(option) => { if (option.id) assign(txn, option.id); }}
+      />
+    );
   }
 
   return (
@@ -226,20 +238,11 @@ export default function GeneralScreen() {
               // that), never to another store.
               canPick={user?.role === 'owner'}
               onAssignMine={() => { if (user?.storeId) assign(txn, user.storeId); }}
-              onAssignTo={() => setPickerTxn(txn)}
+              onAssignTo={() => openPicker(txn)}
             />
           ))
         )}
       </ScrollView>
-
-      {/* Store picker for supervisor/owner */}
-      <StorePickerModal
-        visible={!!pickerTxn}
-        onClose={() => setPickerTxn(null)}
-        title={t.general.pickStoreTitle}
-        options={stores.map(s => ({ id: s.id, name: s.name }))}
-        onSelect={(option) => { if (pickerTxn && option.id) assign(pickerTxn, option.id); }}
-      />
     </View>
   );
 }

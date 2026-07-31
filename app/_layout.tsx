@@ -14,6 +14,7 @@ import { LocaleProvider } from '../store/LocaleStore';
 import { AuthProvider } from '../store/AuthStore';
 import { PaymentsProvider } from '../store/PaymentsStore';
 import { StoresProvider } from '../store/StoresStore';
+import { BottomSheetProvider } from '../store/BottomSheetStore';
 import { useNotificationCapture } from '../hooks/useNotificationCapture';
 
 SplashScreen.preventAutoHideAsync();
@@ -59,7 +60,9 @@ export default function RootLayout() {
           <AuthProvider>
             <StoresProvider>
               <PaymentsProvider>
-                <AppStack />
+                <BottomSheetProvider>
+                  <AppStack />
+                </BottomSheetProvider>
               </PaymentsProvider>
             </StoresProvider>
           </AuthProvider>
