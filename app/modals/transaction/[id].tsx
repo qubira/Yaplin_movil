@@ -267,9 +267,13 @@ function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, subm
           screen) — only the sheet card itself moves for the keyboard, inside
           the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
           bottom showing the screen behind the modal, uncovered. */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
         <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
-        <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%' }}>
+        <View style={{
+          backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
+          padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%',
+          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+        }}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>{title}</Text>
@@ -872,7 +876,7 @@ export default function TransactionDetailScreen() {
 
       {/* ══ FALLBACK: no mail app configured ══ */}
       <Modal visible={supportModal} transparent animationType="fade" onRequestClose={() => setSupportModal(false)} statusBarTranslucent navigationBarTranslucent>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 32 }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(6,6,10,0.82)', padding: 32 }}>
           <View style={{ width: '100%', backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 24 }}>
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
               {t.transaction.noMailApp.title}

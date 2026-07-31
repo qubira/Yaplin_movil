@@ -489,10 +489,11 @@ export default function DashboardScreen() {
 
       {/* ── Picker modal ── */}
       <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={() => setPickerVisible(false)} statusBarTranslucent navigationBarTranslucent>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' }} onPress={() => setPickerVisible(false)} />
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(6,6,10,0.82)' }} onPress={() => setPickerVisible(false)} />
         <View style={{
-          backgroundColor: Colors.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          backgroundColor: Colors.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
           padding: 24, paddingBottom: insets.bottom + 24, borderTopWidth: 1, borderColor: Colors.BORDER,
+          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
         }}>
           <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.BORDER, alignSelf: 'center', marginBottom: 20 }} />
           <Text style={{ color: Colors.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>

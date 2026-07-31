@@ -139,9 +139,12 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
           screen) — only the sheet card itself moves for the keyboard, inside
           the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
           bottom showing the screen behind the modal, uncovered. */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
         <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
-        <View style={[styles.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%' }]}>
+        <View style={[styles.addSheet, {
+          backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
+          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+        }]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={[styles.sheetHandle, { backgroundColor: c.BORDER }]} />
             <Text style={[styles.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
@@ -499,7 +502,7 @@ const styles = StyleSheet.create({
   rolePill: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
   roleText: { fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold' },
   methodCard: { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, minWidth: 80 },
-  addSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '88%' },
+  addSheet: { borderTopLeftRadius: 32, borderTopRightRadius: 20, padding: 24, maxHeight: '88%' },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetTitle: { fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 },
 });

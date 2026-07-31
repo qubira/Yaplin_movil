@@ -176,9 +176,12 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
           screen) — only the sheet card itself moves for the keyboard, inside
           the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
           bottom showing the screen behind the modal, uncovered. */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
         <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
-        <View style={[s.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%' }]}>
+        <View style={[s.addSheet, {
+          backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
+          shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+        }]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={[s.sheetHandle, { backgroundColor: c.BORDER }]} />
             <Text style={[s.sheetTitle, { color: c.TEXT_PRIMARY }]}>{title}</Text>
@@ -508,7 +511,7 @@ const s = StyleSheet.create({
   profileEmail: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 3 },
   permRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1 },
   permLabel: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  addSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '88%' },
+  addSheet: { borderTopLeftRadius: 32, borderTopRightRadius: 20, padding: 24, maxHeight: '88%' },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetTitle: { fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 },
 });
