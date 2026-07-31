@@ -32,6 +32,11 @@ const es = {
     },
     noPaymentsInPeriod: 'Sin pagos en este período',
     generalPoolLabel: 'General',
+    storePicker: {
+      title: 'Elegir tienda',
+      searchPlaceholder: 'Buscar tienda...',
+      noResults: 'Ninguna tienda coincide con esa búsqueda.',
+    },
     relativeTime: {
       now: 'ahora',
       minutesAgo: (n: number) => `hace ${n} min`,

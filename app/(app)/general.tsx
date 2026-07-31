@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Modal, Image, Alert, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Image, Alert, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import EmptyState from '../../components/ui/EmptyState';
 import RefreshButton from '../../components/ui/RefreshButton';
+import StorePickerModal from '../../components/ui/StorePickerModal';
 
 // A manually-entered payment always has a real storeId (POST
 // /transactions/manual requires one), so it can never actually appear in
@@ -232,28 +233,13 @@ export default function GeneralScreen() {
       </ScrollView>
 
       {/* Store picker for supervisor/owner */}
-      <Modal visible={!!pickerTxn} transparent animationType="slide" onRequestClose={() => setPickerTxn(null)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 }}>
-              {t.general.pickStoreTitle}
-            </Text>
-            <View style={{ gap: 8 }}>
-              {stores.map(store => (
-                <TouchableOpacity key={store.id} onPress={() => pickerTxn && assign(pickerTxn, store.id)}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }}>
-                  <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{store.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity onPress={() => setPickerTxn(null)}
-              style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <StorePickerModal
+        visible={!!pickerTxn}
+        onClose={() => setPickerTxn(null)}
+        title={t.general.pickStoreTitle}
+        options={stores.map(s => ({ id: s.id, name: s.name }))}
+        onSelect={(option) => { if (pickerTxn && option.id) assign(pickerTxn, option.id); }}
+      />
     </View>
   );
 }

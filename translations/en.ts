@@ -34,6 +34,11 @@ const en: typeof es = {
     },
     noPaymentsInPeriod: 'No payments in this period',
     generalPoolLabel: 'General',
+    storePicker: {
+      title: 'Choose store',
+      searchPlaceholder: 'Search store...',
+      noResults: 'No store matches that search.',
+    },
     relativeTime: {
       now: 'just now',
       minutesAgo: (n: number) => `${n}m ago`,

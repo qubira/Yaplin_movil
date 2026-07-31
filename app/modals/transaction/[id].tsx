@@ -263,14 +263,12 @@ function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, subm
   const t = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        // 'padding' on both platforms — 'height' on Android fights with the
-        // OS's own adjustResize inside a transparent Modal, producing a
-        // rapid resize/flicker loop when the keyboard is dismissed.
-        behavior="padding"
-      >
+      {/* The dark overlay stays a plain flex:1 View (always covers the full
+          screen) — only the sheet card itself moves for the keyboard, inside
+          the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
+          bottom showing the screen behind the modal, uncovered. */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
         <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%' }}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
@@ -289,8 +287,8 @@ function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, subm
             </TouchableOpacity>
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </View>
-      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -360,6 +358,7 @@ export default function TransactionDetailScreen() {
   const [actionError, setActionError] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [moveTarget, setMoveTarget] = useState<{ id: string | null; name: string } | null>(null);
+  const [moveSearch, setMoveSearch] = useState('');
   const [newAmountText, setNewAmountText] = useState('');
   const [correctReason, setCorrectReason] = useState('');
   const [confirmValue, setConfirmValue] = useState('');
@@ -444,7 +443,7 @@ export default function TransactionDetailScreen() {
     setActionError('');
     setConfirmValue('');
     if (kind === 'correct' && transaction) { setNewAmountText(String(transaction.amount)); setCorrectReason(''); }
-    if (kind === 'move') setMoveTarget(null);
+    if (kind === 'move') { setMoveTarget(null); setMoveSearch(''); }
     setActionModal(kind);
   }
 
@@ -907,19 +906,36 @@ export default function TransactionDetailScreen() {
         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
           {t.transaction.moveModal.description}
         </Text>
+        {moveOptions.length > 5 && (
+          <>
+            <Input
+              placeholder={t.common.storePicker.searchPlaceholder}
+              value={moveSearch}
+              onChangeText={setMoveSearch}
+              leftIcon="search-outline"
+            />
+            <View style={{ height: 8 }} />
+          </>
+        )}
         <View style={{ gap: 8, marginBottom: 8 }}>
-          {moveOptions.map(option => {
-            const active = moveTarget?.id === option.id;
-            return (
-              <TouchableOpacity key={option.id ?? '__general__'} onPress={() => setMoveTarget(option)}
-                style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
-                <Text style={{ flex: 1, color: active ? '#fff' : c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                  {option.id === null ? t.transaction.moveModal.generalOption : option.name}
-                </Text>
-                {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
-              </TouchableOpacity>
-            );
-          })}
+          {moveOptions
+            .filter(option => {
+              if (option.id === null) return true;
+              const term = moveSearch.trim().toLowerCase();
+              return !term || option.name.toLowerCase().includes(term);
+            })
+            .map(option => {
+              const active = moveTarget?.id === option.id;
+              return (
+                <TouchableOpacity key={option.id ?? '__general__'} onPress={() => setMoveTarget(option)}
+                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
+                  <Text style={{ flex: 1, color: active ? '#fff' : c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                    {option.id === null ? t.transaction.moveModal.generalOption : option.name}
+                  </Text>
+                  {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+                </TouchableOpacity>
+              );
+            })}
         </View>
       </ActionModalShell>
 

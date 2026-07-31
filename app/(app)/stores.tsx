@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal, Alert, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal, Alert, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -135,14 +135,12 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        // 'padding' on both platforms — 'height' on Android fights with the
-        // OS's own adjustResize inside a transparent Modal, producing a
-        // rapid resize/flicker loop when the keyboard is dismissed.
-        behavior="padding"
-      >
+      {/* The dark overlay stays a plain flex:1 View (always covers the full
+          screen) — only the sheet card itself moves for the keyboard, inside
+          the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
+          bottom showing the screen behind the modal, uncovered. */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
         <View style={[styles.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%' }]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={[styles.sheetHandle, { backgroundColor: c.BORDER }]} />
@@ -180,8 +178,8 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
             </TouchableOpacity>
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </View>
-      </KeyboardAvoidingView>
     </Modal>
   );
 }

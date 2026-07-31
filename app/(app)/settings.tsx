@@ -193,14 +193,15 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        // 'padding' on both platforms — 'height' on Android fights with the
-        // OS's own adjustResize inside a transparent Modal, producing a
-        // rapid resize/flicker loop when the keyboard is dismissed.
-        behavior="padding"
-      >
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      {/* The dark overlay stays a plain flex:1 View (always covers the full
+          screen) — only the sheet card itself moves for the keyboard, inside
+          the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
+          bottom showing the screen behind the modal, uncovered. */}
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <KeyboardAvoidingView
+          style={{ width: '100%' }}
+          behavior="padding"
+        >
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>{title}</Text>
@@ -240,8 +241,8 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
               <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.pinModal.cancel}</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

@@ -15,6 +15,7 @@ import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 import RefreshButton from '../../components/ui/RefreshButton';
+import StorePickerModal from '../../components/ui/StorePickerModal';
 import { dictionaries } from '../../translations';
 
 function roleConfig(t: typeof dictionaries['es']) {
@@ -140,6 +141,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
   const [storeId, setStoreId] = useState<string>('all');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [storePickerOpen, setStorePickerOpen] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -168,15 +170,14 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
   }
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        // 'padding' on both platforms — 'height' on Android fights with the
-        // OS's own adjustResize inside a transparent Modal, producing a
-        // rapid resize/flicker loop when the keyboard is dismissed.
-        behavior="padding"
-      >
+      {/* The dark overlay stays a plain flex:1 View (always covers the full
+          screen) — only the sheet card itself moves for the keyboard, inside
+          the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
+          bottom showing the screen behind the modal, uncovered. */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
         <View style={[s.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%' }]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={[s.sheetHandle, { backgroundColor: c.BORDER }]} />
@@ -220,17 +221,14 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
             {canEditStore && (
               <>
                 <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {[{ id: 'all', name: t.team.allStores }, ...storeOptions].map(opt => {
-                    const active = storeId === opt.id;
-                    return (
-                      <TouchableOpacity key={opt.id} onPress={() => setStoreId(opt.id)} activeOpacity={0.8}
-                        style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
-                        <Text style={{ color: active ? '#fff' : c.TEXT_SECONDARY, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{opt.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <TouchableOpacity onPress={() => setStorePickerOpen(true)} activeOpacity={0.8}
+                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }}>
+                  <Ionicons name="business-outline" size={18} color={c.TEXT_SECONDARY} style={{ marginRight: 10 }} />
+                  <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                    {[{ id: 'all', name: t.team.allStores }, ...storeOptions].find(o => o.id === storeId)?.name ?? t.team.allStores}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={c.TEXT_SECONDARY} />
+                </TouchableOpacity>
               </>
             )}
 
@@ -248,9 +246,19 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
             </TouchableOpacity>
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </View>
-      </KeyboardAvoidingView>
     </Modal>
+
+    <StorePickerModal
+      visible={storePickerOpen}
+      onClose={() => setStorePickerOpen(false)}
+      title={t.team.storeAssignedLabel}
+      options={[{ id: 'all', name: t.team.allStores, pinned: true }, ...storeOptions]}
+      selectedId={storeId}
+      onSelect={(option) => setStoreId(option.id ?? 'all')}
+    />
+    </>
   );
 }
 

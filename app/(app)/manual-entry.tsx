@@ -13,6 +13,7 @@ import { ApiError } from '../../services/api';
 import { useTopInset } from '../../hooks/useTopInset';
 import Input from '../../components/ui/Input';
 import EmptyState from '../../components/ui/EmptyState';
+import StorePickerModal from '../../components/ui/StorePickerModal';
 
 export default function ManualEntryScreen() {
   const { c } = useTheme();
@@ -29,6 +30,9 @@ export default function ManualEntryScreen() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const selectedStoreName = stores.find(s => s.id === storeId)?.name ?? null;
 
   // The nav entry point is hidden from non-owners, but a stray deep link or
   // stale bookmark could still land here — the backend also rejects the
@@ -96,18 +100,14 @@ export default function ManualEntryScreen() {
         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontWeight: '600', marginBottom: 8, fontFamily: 'Inter_600SemiBold' }}>
           {t.manualEntry.storeLabel}
         </Text>
-        <View style={{ gap: 8, marginBottom: 16 }}>
-          {stores.map(store => {
-            const active = store.id === storeId;
-            return (
-              <TouchableOpacity key={store.id} onPress={() => setStoreId(store.id)}
-                style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: active ? c.ACCENT_PURPLE : c.BACKGROUND_CARD_2, borderColor: active ? c.ACCENT_PURPLE : c.BORDER }}>
-                <Text style={{ flex: 1, color: active ? '#fff' : c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{store.name}</Text>
-                {active && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <TouchableOpacity onPress={() => setPickerOpen(true)}
+          style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, borderWidth: 1, backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginBottom: 16 }}>
+          <Ionicons name="business-outline" size={18} color={c.TEXT_SECONDARY} style={{ marginRight: 10 }} />
+          <Text style={{ flex: 1, color: selectedStoreName ? c.TEXT_PRIMARY : c.TEXT_SECONDARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+            {selectedStoreName ?? t.manualEntry.storeLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color={c.TEXT_SECONDARY} />
+        </TouchableOpacity>
 
         <Input
           label={t.manualEntry.amountLabel}
@@ -142,6 +142,14 @@ export default function ManualEntryScreen() {
         </TouchableOpacity>
       </ScrollView>
       </KeyboardAvoidingView>
+
+      <StorePickerModal
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        options={stores.map(s => ({ id: s.id, name: s.name }))}
+        selectedId={storeId}
+        onSelect={(option) => setStoreId(option.id)}
+      />
     </View>
   );
 }
