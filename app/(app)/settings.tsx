@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -235,6 +235,85 @@ function PinSheetCard({ mode, hasExisting, onClose, onSaved }: {
   );
 }
 
+function PlinBankSheetContent({ onClose, requestOrToggle }: {
+  onClose: () => void;
+  requestOrToggle: (current: boolean, setter: (v: boolean) => void) => void;
+}) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  const { integrations, setPlinBank } = useIntegrations();
+
+  return (
+    <View style={{
+      backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
+      padding: 24, paddingBottom: insets.bottom + 20,
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }}>
+      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+      <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
+        {t.settings.plinModal.title}
+      </Text>
+      <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+        {t.settings.plinModal.description}
+      </Text>
+      <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+        {PLIN_BANKS.map((bank, i) => (
+          <View key={bank.key} style={i === PLIN_BANKS.length - 1 ? undefined : { borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
+            <ToggleRow
+              icon="business-outline"
+              label={bank.label}
+              value={integrations.plinBanks[bank.key]}
+              onValueChange={() => requestOrToggle(integrations.plinBanks[bank.key], (v) => setPlinBank(bank.key, v))}
+            />
+          </View>
+        ))}
+      </View>
+      <TouchableOpacity onPress={onClose}
+        style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+        <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.plinModal.done}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function LanguageSheetContent({ onClose }: { onClose: () => void }) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const t = useTranslation();
+  const { setLocale } = useLocale();
+
+  return (
+    <View style={{
+      backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
+      padding: 24, paddingBottom: insets.bottom + 20,
+      shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
+    }}>
+      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
+      <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
+        {t.settings.languageModal.title}
+      </Text>
+      <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
+        {t.settings.languageModal.description}
+      </Text>
+      <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
+        {LOCALES.map((code, i) => (
+          <View key={code} style={i === LOCALES.length - 1 ? undefined : { borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
+            <LanguageRow
+              code={code}
+              onPress={() => { setLocale(code); onClose(); }}
+            />
+          </View>
+        ))}
+      </View>
+      <TouchableOpacity onPress={onClose}
+        style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
+        <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.languageModal.done}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -255,8 +334,6 @@ export default function SettingsScreen() {
   const versionInfo = getAppVersionInfo();
   const { present, dismiss } = useBottomSheet();
   const [permissionGranted, setPermissionGranted] = useState(false);
-  const [plinModal, setPlinModal] = useState(false);
-  const [languageModal, setLanguageModal] = useState(false);
 
   function openPinSheet(mode: 'save' | 'remove') {
     present(
@@ -267,6 +344,14 @@ export default function SettingsScreen() {
         onSaved={() => { refreshUser().catch(() => {}); }}
       />
     );
+  }
+
+  function openPlinSheet() {
+    present(<PlinBankSheetContent onClose={dismiss} requestOrToggle={requestOrToggle} />);
+  }
+
+  function openLanguageSheet() {
+    present(<LanguageSheetContent onClose={dismiss} />);
   }
 
   // When "Conectar" has to send the user to Android Settings first, we remember
@@ -425,7 +510,7 @@ export default function SettingsScreen() {
               <IntegrationRow name="Plin" color={PaymentColors.plin} icon="wallet-outline"
                 connected={plinConnectedCount > 0}
                 connectedLabel={t.settings.integrations.bankCount(plinConnectedCount)}
-                onToggle={() => setPlinModal(true)} />
+                onToggle={openPlinSheet} />
               <IntegrationRow name="Izipay" color={PaymentColors.izipay} icon="card-outline"
                 connected={integrations.izipay} onToggle={() => requestOrToggle(integrations.izipay, setIzipay)} />
               {!permissionGranted && (
@@ -441,7 +526,7 @@ export default function SettingsScreen() {
           {/* Idioma */}
           <SectionTitle title={t.settings.languageSection} />
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
-            <TouchableOpacity onPress={() => setLanguageModal(true)}
+            <TouchableOpacity onPress={openLanguageSheet}
               style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 18 }}>
               <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: `${c.ACCENT_PURPLE}22`, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
                 <Ionicons name="language-outline" size={18} color={c.ACCENT_PURPLE} />
@@ -483,73 +568,6 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Plin bank picker */}
-      <Modal visible={plinModal} transparent animationType="slide" onRequestClose={() => setPlinModal(false)} statusBarTranslucent navigationBarTranslucent>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-          <View style={{
-            backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-            padding: 24, paddingBottom: insets.bottom + 20,
-            shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
-          }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-              {t.settings.plinModal.title}
-            </Text>
-            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-              {t.settings.plinModal.description}
-            </Text>
-            <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
-              {PLIN_BANKS.map((bank, i) => (
-                <View key={bank.key} style={i === PLIN_BANKS.length - 1 ? undefined : { borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
-                  <ToggleRow
-                    icon="business-outline"
-                    label={bank.label}
-                    value={integrations.plinBanks[bank.key]}
-                    onValueChange={() => requestOrToggle(integrations.plinBanks[bank.key], (v) => setPlinBank(bank.key, v))}
-                  />
-                </View>
-              ))}
-            </View>
-            <TouchableOpacity onPress={() => setPlinModal(false)}
-              style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.plinModal.done}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Language picker */}
-      <Modal visible={languageModal} transparent animationType="slide" onRequestClose={() => setLanguageModal(false)} statusBarTranslucent navigationBarTranslucent>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-          <View style={{
-            backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-            padding: 24, paddingBottom: insets.bottom + 20,
-            shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
-          }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
-            <Text style={{ color: c.TEXT_PRIMARY, fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>
-              {t.settings.languageModal.title}
-            </Text>
-            <Text style={{ color: c.TEXT_SECONDARY, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 16 }}>
-              {t.settings.languageModal.description}
-            </Text>
-            <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.BORDER, paddingHorizontal: 16 }}>
-              {LOCALES.map((code, i) => (
-                <View key={code} style={i === LOCALES.length - 1 ? undefined : { borderBottomWidth: 1, borderBottomColor: c.BORDER }}>
-                  <LanguageRow
-                    code={code}
-                    onPress={() => { setLocale(code); setLanguageModal(false); }}
-                  />
-                </View>
-              ))}
-            </View>
-            <TouchableOpacity onPress={() => setLanguageModal(false)}
-              style={{ marginTop: 20, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>
-              <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.languageModal.done}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
