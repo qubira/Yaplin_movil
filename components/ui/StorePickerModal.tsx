@@ -47,7 +47,7 @@ export default function StorePickerModal({ visible, onClose, options, selectedId
   }, [options, query]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       {/* The dark overlay stays a plain flex:1 View (always covers the full
           screen) — only the sheet card itself moves for the keyboard. */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>

@@ -134,7 +134,7 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       {/* The dark overlay stays a plain flex:1 View (always covers the full
           screen) — only the sheet card itself moves for the keyboard, inside
           the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
@@ -306,7 +306,7 @@ export default function StoresScreen() {
       </ScrollView>
 
       {/* Store detail modal */}
-      <Modal visible={!!selectedStore} animationType="slide" onRequestClose={() => setSelectedStoreId(null)}>
+      <Modal visible={!!selectedStore} animationType="slide" onRequestClose={() => setSelectedStoreId(null)} statusBarTranslucent navigationBarTranslucent>
         {selectedStore && (
           <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
             <StatusBar style={c.isDark ? 'light' : 'dark'} />

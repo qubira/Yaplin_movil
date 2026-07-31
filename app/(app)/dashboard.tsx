@@ -386,7 +386,7 @@ export default function DashboardScreen() {
       </TouchableOpacity>
 
       {/* ══ VER TODOS MODAL ══ */}
-      <Modal visible={verTodos} animationType="slide" onRequestClose={() => setVerTodos(false)}>
+      <Modal visible={verTodos} animationType="slide" onRequestClose={() => setVerTodos(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={{ flex: 1, backgroundColor: Colors.BACKGROUND_DARK }}>
           <StatusBar style={Colors.isDark ? 'light' : 'dark'} />
 
@@ -488,7 +488,7 @@ export default function DashboardScreen() {
       </Modal>
 
       {/* ── Picker modal ── */}
-      <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={() => setPickerVisible(false)}>
+      <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={() => setPickerVisible(false)} statusBarTranslucent navigationBarTranslucent>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' }} onPress={() => setPickerVisible(false)} />
         <View style={{
           backgroundColor: Colors.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28,

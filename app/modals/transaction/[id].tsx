@@ -262,7 +262,7 @@ function ActionModalShell({ visible, title, onClose, onSubmit, submitLabel, subm
   const insets = useSafeAreaInsets();
   const t = useTranslation();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       {/* The dark overlay stays a plain flex:1 View (always covers the full
           screen) — only the sheet card itself moves for the keyboard, inside
           the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
@@ -741,7 +741,7 @@ export default function TransactionDetailScreen() {
       </ScrollView>
 
       {/* ══ HISTORIAL MODAL ══ */}
-      <Modal visible={historyModal} animationType="slide" onRequestClose={() => setHistoryModal(false)}>
+      <Modal visible={historyModal} animationType="slide" onRequestClose={() => setHistoryModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
           <StatusBar style={c.isDark ? 'light' : 'dark'} />
 
@@ -871,7 +871,7 @@ export default function TransactionDetailScreen() {
       </Modal>
 
       {/* ══ FALLBACK: no mail app configured ══ */}
-      <Modal visible={supportModal} transparent animationType="fade" onRequestClose={() => setSupportModal(false)}>
+      <Modal visible={supportModal} transparent animationType="fade" onRequestClose={() => setSupportModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 32 }}>
           <View style={{ width: '100%', backgroundColor: c.BACKGROUND_CARD, borderRadius: 20, borderWidth: 1, borderColor: c.BORDER, padding: 24 }}>
             <Text style={{ color: c.TEXT_PRIMARY, fontSize: 17, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 8 }}>

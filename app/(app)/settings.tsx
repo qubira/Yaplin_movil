@@ -192,7 +192,7 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
   const title = mode === 'remove' ? t.settings.security.removePin : hasExisting ? t.settings.pinModal.titleChange : t.settings.pinModal.titleSet;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       {/* The dark overlay stays a plain flex:1 View (always covers the full
           screen) — only the sheet card itself moves for the keyboard, inside
           the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
@@ -485,7 +485,7 @@ export default function SettingsScreen() {
       </ScrollView>
 
       {/* Plin bank picker */}
-      <Modal visible={plinModal} transparent animationType="slide" onRequestClose={() => setPlinModal(false)}>
+      <Modal visible={plinModal} transparent animationType="slide" onRequestClose={() => setPlinModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
@@ -525,7 +525,7 @@ export default function SettingsScreen() {
       />
 
       {/* Language picker */}
-      <Modal visible={languageModal} transparent animationType="slide" onRequestClose={() => setLanguageModal(false)}>
+      <Modal visible={languageModal} transparent animationType="slide" onRequestClose={() => setLanguageModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View style={{ backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: insets.bottom + 20 }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />
