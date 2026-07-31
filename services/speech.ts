@@ -25,5 +25,22 @@ export function buildSpokenMessage(transaction: Pick<Transaction, 'payerName' | 
 }
 
 export function announcePayment(transaction: Pick<Transaction, 'payerName' | 'amount' | 'method'>) {
-  Speech.speak(buildSpokenMessage(transaction), { language: 'es-419' });
+  const message = buildSpokenMessage(transaction);
+  Speech.speak(message, {
+    language: 'es-419',
+    // Some Android TTS engines/OEM builds don't have the es-419 (Latin
+    // America) voice pack downloaded and fail silently instead of falling
+    // back on their own — retry once with a bare 'es' so the device's
+    // default Spanish voice gets a chance instead of the alert just never
+    // being heard. onError only fires for a genuine synthesis failure, not
+    // for e.g. audio focus loss, so a single retry here is safe.
+    onError: () => {
+      if (__DEV__) console.log('[YapLin] Speech.speak es-419 ERROR, retrying with es');
+      try {
+        Speech.speak(message, { language: 'es' });
+      } catch (e) {
+        if (__DEV__) console.log('[YapLin] Speech.speak es fallback ERROR', String(e));
+      }
+    },
+  });
 }

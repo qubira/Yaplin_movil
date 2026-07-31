@@ -159,9 +159,16 @@ export function useNotificationCapture() {
     // backend regardless of whether this phone has a store concept at all
     // — the backend decides GENERAL-vs-auto-assign on its own from the
     // business's active stores, not from anything the client sends.
-    if (voiceEnabledRef.current) announcePayment(transaction);
-    if (pushEnabledRef.current) notifyPaymentReceived(transaction);
-
+    //
+    // Registering the transaction runs FIRST and unconditionally, before the
+    // voice/push side effects, and those are wrapped in try/catch — unlike
+    // notifyPaymentReceived (an async function, whose synchronous-looking
+    // throws actually become promise rejections that don't propagate here),
+    // Speech.speak() calls straight into a native module and CAN throw
+    // synchronously (e.g. no TTS engine available). Uncaught, that used to
+    // abort this whole function before addTransactionRef ever ran — a
+    // failure in the purely-cosmetic voice alert was silently dropping the
+    // actual payment capture.
     addTransactionRef.current(transaction).catch(() => {
       enqueueOfflineTransaction({
         payerName: transaction.payerName,
@@ -173,6 +180,19 @@ export function useNotificationCapture() {
         status: transaction.status,
       });
     });
+
+    if (voiceEnabledRef.current) {
+      try {
+        announcePayment(transaction);
+      } catch (e) {
+        if (__DEV__) console.log('[YapLin] announcePayment ERROR', String(e));
+      }
+    }
+    if (pushEnabledRef.current) {
+      notifyPaymentReceived(transaction).catch((e) => {
+        if (__DEV__) console.log('[YapLin] notifyPaymentReceived ERROR', String(e));
+      });
+    }
   }).current;
 
   useEffect(() => {
