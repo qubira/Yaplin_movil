@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { useAuth } from '../../store/AuthStore';
 import { useTranslation } from '../../store/LocaleStore';
 import { ApiError } from '../../services/api';
 import { useTopInset } from '../../hooks/useTopInset';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import Input from '../../components/ui/Input';
 import EmptyState from '../../components/ui/EmptyState';
 import StorePickerModal from '../../components/ui/StorePickerModal';
@@ -31,6 +32,7 @@ export default function ManualEntryScreen() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
 
   const selectedStoreName = stores.find(s => s.id === storeId)?.name ?? null;
 
@@ -88,15 +90,7 @@ export default function ManualEntryScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        // 'padding' on both platforms — 'height' on Android fights with the
-        // OS's own adjustResize, producing a rapid resize/flicker loop when
-        // the keyboard is dismissed.
-        behavior="padding"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? topInset : 0}
-      >
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 40 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 40 + keyboardHeight }}>
         <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontWeight: '600', marginBottom: 8, fontFamily: 'Inter_600SemiBold' }}>
           {t.manualEntry.storeLabel}
         </Text>
@@ -141,7 +135,6 @@ export default function ManualEntryScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
-      </KeyboardAvoidingView>
 
       <StorePickerModal
         visible={pickerOpen}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Switch, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +9,7 @@ import { useTeam, useStores } from '../../store/StoresStore';
 import { useAuth } from '../../store/AuthStore';
 import { useTranslation } from '../../store/LocaleStore';
 import { useTopInset } from '../../hooks/useTopInset';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { ApiError } from '../../services/api';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
@@ -142,6 +143,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [storePickerOpen, setStorePickerOpen] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (!visible) return;
@@ -173,11 +175,12 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
     <>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       {/* The dark overlay stays a plain flex:1 View (always covers the full
-          screen) — only the sheet card itself moves for the keyboard, inside
-          the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
-          bottom showing the screen behind the modal, uncovered. */}
+          screen) — only the sheet card itself moves for the keyboard, via
+          useKeyboardHeight()'s tracked height (see hooks/useKeyboardHeight.ts
+          for why this replaced KeyboardAvoidingView: it left a residual gap
+          right after the keyboard was dismissed). */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
+        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
         <View style={[s.addSheet, {
           backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
           shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
@@ -249,7 +252,7 @@ function MemberFormSheet({ visible, onClose, initial, storeOptions, onSubmit, ti
             </TouchableOpacity>
           </ScrollView>
         </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
 

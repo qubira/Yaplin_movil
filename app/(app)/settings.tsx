@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState, Modal, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { isXiaomiDevice, openXiaomiAutostartSettings, requestIgnoreBatteryOptimi
 import { requestPushPermission } from '../../services/pushNotifications';
 import { getAppVersionInfo } from '../../services/appVersion';
 import { useTopInset } from '../../hooks/useTopInset';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
@@ -158,6 +159,7 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const t = useTranslation();
+  const keyboardHeight = useKeyboardHeight();
   const [password, setPassword] = useState('');
   const [newPin, setNewPin] = useState('');
   const [error, setError] = useState('');
@@ -194,14 +196,12 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       {/* The dark overlay stays a plain flex:1 View (always covers the full
-          screen) — only the sheet card itself moves for the keyboard, inside
-          the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
-          bottom showing the screen behind the modal, uncovered. */}
+          screen) — only the sheet card itself moves for the keyboard, via
+          useKeyboardHeight()'s tracked height (see hooks/useKeyboardHeight.ts
+          for why this replaced KeyboardAvoidingView: it left a residual gap
+          right after the keyboard was dismissed). */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <KeyboardAvoidingView
-          style={{ width: '100%' }}
-          behavior="padding"
-        >
+        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
           <View style={{
             backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
             padding: 24, paddingBottom: insets.bottom + 20,
@@ -245,7 +245,7 @@ function PinModal({ visible, mode, hasExisting, onClose, onSaved }: {
               <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.settings.pinModal.cancel}</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   );

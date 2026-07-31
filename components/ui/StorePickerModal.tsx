@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../constants/theme';
 import { useTranslation } from '../../store/LocaleStore';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import Input from './Input';
 
 export interface StorePickerOption {
@@ -34,6 +35,7 @@ export default function StorePickerModal({ visible, onClose, options, selectedId
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const t = useTranslation();
+  const keyboardHeight = useKeyboardHeight();
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function StorePickerModal({ visible, onClose, options, selectedId
       {/* The dark overlay stays a plain flex:1 View (always covers the full
           screen) — only the sheet card itself moves for the keyboard. */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
+        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
           <View style={{
             backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
             padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '80%',
@@ -102,7 +104,7 @@ export default function StorePickerModal({ visible, onClose, options, selectedId
               <Text style={{ color: c.TEXT_PRIMARY, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.cancel}</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   );

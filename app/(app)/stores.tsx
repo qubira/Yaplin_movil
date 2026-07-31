@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal, Alert, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -16,6 +16,7 @@ import TransactionItem from '../../components/ui/TransactionItem';
 import { useTranslation } from '../../store/LocaleStore';
 import { computeStoreRevenue, StoreRevenue } from '../../services/storeRevenue';
 import { useTopInset } from '../../hooks/useTopInset';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import Avatar from '../../components/ui/Avatar';
 import BrandLoader from '../../components/ui/BrandLoader';
 import Input from '../../components/ui/Input';
@@ -110,6 +111,7 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const t = useTranslation();
+  const keyboardHeight = useKeyboardHeight();
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [account, setAccount] = useState('');
@@ -136,11 +138,12 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       {/* The dark overlay stays a plain flex:1 View (always covers the full
-          screen) — only the sheet card itself moves for the keyboard, inside
-          the KeyboardAvoidingView. Wrapping the overlay too left a gap at the
-          bottom showing the screen behind the modal, uncovered. */}
+          screen) — only the sheet card itself moves for the keyboard, via
+          useKeyboardHeight()'s tracked height (see hooks/useKeyboardHeight.ts
+          for why this replaced KeyboardAvoidingView: it left a residual gap
+          right after the keyboard was dismissed). */}
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
-        <KeyboardAvoidingView style={{ width: '100%' }} behavior="padding">
+        <View style={{ width: '100%', marginBottom: keyboardHeight }}>
         <View style={[styles.addSheet, {
           backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
           shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
@@ -181,7 +184,7 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
             </TouchableOpacity>
           </ScrollView>
         </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   );
@@ -198,6 +201,7 @@ export default function StoresScreen() {
   const { user } = useAuth();
   const isOwner = user?.role === 'owner';
 
+  const keyboardHeight = useKeyboardHeight();
   const [addModal, setAddModal] = useState(false);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
@@ -335,14 +339,7 @@ export default function StoresScreen() {
                 </>
               )}
             </View>
-            <KeyboardAvoidingView
-              style={{ flex: 1 }}
-              // 'padding' on both platforms — 'height' on Android fights with the
-              // OS's own adjustResize inside a transparent Modal, producing a
-              // rapid resize/flicker loop when the keyboard is dismissed.
-              behavior="padding"
-            >
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 + keyboardHeight }}>
 
               {/* Account info */}
               <View style={[styles.detailCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
@@ -441,7 +438,6 @@ export default function StoresScreen() {
                   ));
               })()}
             </ScrollView>
-            </KeyboardAvoidingView>
           </View>
         )}
       </Modal>
