@@ -86,7 +86,10 @@ export default function ManualEntryScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // 'padding' on both platforms — 'height' on Android fights with the
+        // OS's own adjustResize, producing a rapid resize/flicker loop when
+        // the keyboard is dismissed.
+        behavior="padding"
         keyboardVerticalOffset={Platform.OS === 'ios' ? topInset : 0}
       >
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 40 }}>

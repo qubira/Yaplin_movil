@@ -137,7 +137,10 @@ function StoreFormSheet({ visible, onClose, initial, onSubmit, title }: {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // 'padding' on both platforms — 'height' on Android fights with the
+        // OS's own adjustResize inside a transparent Modal, producing a
+        // rapid resize/flicker loop when the keyboard is dismissed.
+        behavior="padding"
       >
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={[styles.addSheet, { backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%' }]}>
@@ -333,7 +336,10 @@ export default function StoresScreen() {
             </View>
             <KeyboardAvoidingView
               style={{ flex: 1 }}
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              // 'padding' on both platforms — 'height' on Android fights with the
+              // OS's own adjustResize inside a transparent Modal, producing a
+              // rapid resize/flicker loop when the keyboard is dismissed.
+              behavior="padding"
             >
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
 
