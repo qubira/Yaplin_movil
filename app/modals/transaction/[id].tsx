@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, ReactNode } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Share, Image,
-  Modal, LayoutAnimation, Platform, UIManager, Linking, ActivityIndicator,
+  Modal, LayoutAnimation, Platform, UIManager, Linking, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +23,14 @@ import Input from '../../../components/ui/Input';
 import { useBottomSheet } from '../../../store/BottomSheetStore';
 
 const SUPPORT_EMAIL = 'qubirasac@gmail.com';
+
+// A percentage maxHeight (e.g. '90%') resolves against the sheet's immediate
+// parent, which BottomSheetStore.tsx sizes by content rather than a fixed
+// height — Yoga can't resolve a percentage against an ancestor whose own
+// height depends on this same child, and on Android that ambiguity showed up
+// as the sheet floating above the true bottom edge with a visible gap below
+// it. A concrete pixel value from Dimensions has no such ambiguity.
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 function isArchivedClient(timestamp: Date): boolean {
   return timestamp.getFullYear() < new Date().getFullYear();
@@ -264,7 +272,7 @@ function ActionModalShell({ title, onClose, onSubmit, submitLabel, submitting, e
   return (
     <View style={{
       backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '90%',
+      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: SCREEN_HEIGHT * 0.9,
       shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
     }}>
       <ScrollView keyboardShouldPersistTaps="handled">

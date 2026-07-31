@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Switch } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Switch, Dimensions, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +18,12 @@ import ThemeToggle from '../../components/ui/ThemeToggle';
 import RefreshButton from '../../components/ui/RefreshButton';
 import StorePickerModal from '../../components/ui/StorePickerModal';
 import { dictionaries } from '../../translations';
+
+// A percentage maxHeight resolves against this sheet's immediate parent,
+// which BottomSheetStore.tsx sizes by content rather than a fixed height —
+// that ambiguity showed up on Android as the sheet floating above the true
+// bottom edge with a visible gap below it. A pixel value has no such issue.
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 function roleConfig(t: typeof dictionaries['es']) {
   return {
@@ -173,7 +179,7 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
 
   return (
     <View style={[s.addSheet, {
-      backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
+      backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: SCREEN_HEIGHT * 0.85,
       shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
     }]}>
       <ScrollView keyboardShouldPersistTaps="handled">
@@ -303,6 +309,100 @@ export default function TeamScreen() {
     ]);
   }
 
+  // Member detail used to be its own <Modal> — a separate native Android
+  // window, which sat ABOVE the main app window that BottomSheetProvider's
+  // overlay lives in. Opening the edit sheet from here (via present())
+  // rendered it in the main window, one layer BEHIND the detail Modal's own
+  // window, so it looked like pressing "Editar" silently sent you back to
+  // the team list instead of opening a sheet in front of you. Rendering the
+  // detail view as a plain conditional return — same window as everything
+  // else — fixes that; BackHandler below replaces the Modal's built-in
+  // onRequestClose for the hardware back button.
+  useEffect(() => {
+    if (!selected) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelectedId(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [selected]);
+
+  if (selected) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
+        <StatusBar style={c.isDark ? 'light' : 'dark'} />
+        <View style={[s.header, { paddingTop: insets.top + 16, borderBottomColor: c.BORDER }]}>
+          <TouchableOpacity onPress={() => setSelectedId(null)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }]}>
+            <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
+          </TouchableOpacity>
+          <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY, marginLeft: 14, flex: 1 }]}>{t.team.memberDetailTitle}</Text>
+          {selectedEditPerms?.canEdit && (
+            <TouchableOpacity onPress={() => openEditSheet(selected)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
+              <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
+            </TouchableOpacity>
+          )}
+          {user?.role === 'owner' && (
+            <TouchableOpacity onPress={() => handleDelete(selected)} style={[s.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
+              <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
+          {/* Profile */}
+          <View style={[s.profileCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
+            <Avatar initials={selected.initials} size="lg" color={selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS} />
+            <Text style={[s.profileName, { color: c.TEXT_PRIMARY }]}>{selected.name}</Text>
+            <Text style={[s.profileEmail, { color: c.TEXT_SECONDARY }]}>{selected.email || t.common.fallback.noEmail}</Text>
+            <View style={[s.rolePill, {
+              backgroundColor: `${selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS}18`,
+              borderColor: `${selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS}40`,
+              marginTop: 10,
+            }]}>
+              <Text style={{ color: selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                {ROLE_CONFIG[selected.role].label}
+              </Text>
+            </View>
+          </View>
+
+          {/* Active toggle */}
+          <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, marginTop: 16, padding: 16, flexDirection: 'row', alignItems: 'center' }]}>
+            <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.team.activeMemberLabel}</Text>
+            <Switch
+              value={selected.active}
+              onValueChange={(v) => updateMember(selected.id, { active: v })}
+              trackColor={{ false: c.BORDER, true: `${c.ACCENT_PURPLE}80` }}
+              thumbColor={selected.active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY}
+            />
+          </View>
+
+          {/* Permissions */}
+          <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.permissionsTitle}</Text>
+          <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
+            {PERM_BY_ROLE[selected.role].map((perm, i) => (
+              <View key={i} style={[s.permRow, i === PERM_BY_ROLE[selected.role].length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: c.BORDER }]}>
+                <Ionicons name={perm.allowed ? 'checkmark-circle' : 'close-circle'} size={18} color={perm.allowed ? c.SUCCESS : c.BORDER} />
+                <Text style={[s.permLabel, { color: perm.allowed ? c.TEXT_PRIMARY : c.TEXT_SECONDARY }]}>{perm.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Store assignment */}
+          <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
+          <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, padding: 16 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={[s.roleStatIcon, { backgroundColor: `${c.ACCENT_PURPLE}18` }]}>
+                <Ionicons name="business-outline" size={18} color={c.ACCENT_PURPLE} />
+              </View>
+              <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                {storeNameFor(selected.storeId)}
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
@@ -384,84 +484,6 @@ export default function TeamScreen() {
           )}
         </View>
       </ScrollView>
-
-      {/* Member detail modal */}
-      <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelectedId(null)} statusBarTranslucent navigationBarTranslucent>
-        {selected && (
-          <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
-            <StatusBar style={c.isDark ? 'light' : 'dark'} />
-            <View style={[s.header, { paddingTop: insets.top + 16, borderBottomColor: c.BORDER }]}>
-              <TouchableOpacity onPress={() => setSelectedId(null)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }]}>
-                <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
-              </TouchableOpacity>
-              <Text style={[s.headerTitle, { color: c.TEXT_PRIMARY, marginLeft: 14, flex: 1 }]}>{t.team.memberDetailTitle}</Text>
-              {selectedEditPerms?.canEdit && (
-                <TouchableOpacity onPress={() => openEditSheet(selected)} style={[s.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
-                  <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
-                </TouchableOpacity>
-              )}
-              {user?.role === 'owner' && (
-                <TouchableOpacity onPress={() => handleDelete(selected)} style={[s.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
-                  <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
-                </TouchableOpacity>
-              )}
-            </View>
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
-              {/* Profile */}
-              <View style={[s.profileCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
-                <Avatar initials={selected.initials} size="lg" color={selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS} />
-                <Text style={[s.profileName, { color: c.TEXT_PRIMARY }]}>{selected.name}</Text>
-                <Text style={[s.profileEmail, { color: c.TEXT_SECONDARY }]}>{selected.email || t.common.fallback.noEmail}</Text>
-                <View style={[s.rolePill, {
-                  backgroundColor: `${selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS}18`,
-                  borderColor: `${selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS}40`,
-                  marginTop: 10,
-                }]}>
-                  <Text style={{ color: selected.role === 'owner' ? c.ACCENT_PURPLE : selected.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                    {ROLE_CONFIG[selected.role].label}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Active toggle */}
-              <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, marginTop: 16, padding: 16, flexDirection: 'row', alignItems: 'center' }]}>
-                <Text style={{ flex: 1, color: c.TEXT_PRIMARY, fontSize: 14, fontFamily: 'Inter_400Regular' }}>{t.team.activeMemberLabel}</Text>
-                <Switch
-                  value={selected.active}
-                  onValueChange={(v) => updateMember(selected.id, { active: v })}
-                  trackColor={{ false: c.BORDER, true: `${c.ACCENT_PURPLE}80` }}
-                  thumbColor={selected.active ? c.ACCENT_PURPLE : c.TEXT_SECONDARY}
-                />
-              </View>
-
-              {/* Permissions */}
-              <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.permissionsTitle}</Text>
-              <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
-                {PERM_BY_ROLE[selected.role].map((perm, i) => (
-                  <View key={i} style={[s.permRow, i === PERM_BY_ROLE[selected.role].length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: c.BORDER }]}>
-                    <Ionicons name={perm.allowed ? 'checkmark-circle' : 'close-circle'} size={18} color={perm.allowed ? c.SUCCESS : c.BORDER} />
-                    <Text style={[s.permLabel, { color: perm.allowed ? c.TEXT_PRIMARY : c.TEXT_SECONDARY }]}>{perm.label}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Store assignment */}
-              <Text style={[s.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.team.storeAssignedLabel}</Text>
-              <View style={[s.matrixCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, padding: 16 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={[s.roleStatIcon, { backgroundColor: `${c.ACCENT_PURPLE}18` }]}>
-                    <Ionicons name="business-outline" size={18} color={c.ACCENT_PURPLE} />
-                  </View>
-                  <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
-                    {storeNameFor(selected.storeId)}
-                  </Text>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        )}
-      </Modal>
-
     </View>
   );
 }
@@ -494,7 +516,7 @@ const s = StyleSheet.create({
   profileEmail: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 3 },
   permRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1 },
   permLabel: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  addSheet: { borderTopLeftRadius: 32, borderTopRightRadius: 20, padding: 24, maxHeight: '88%' },
+  addSheet: { borderTopLeftRadius: 32, borderTopRightRadius: 20, padding: 24, maxHeight: SCREEN_HEIGHT * 0.88 },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetTitle: { fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 },
 });

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Modal, StyleSheet, Dimensions, Image, Alert,
@@ -301,13 +301,33 @@ export default function DashboardScreen() {
 
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
   const [verTodos, setVerTodos]       = useState(false);
-  const { transactions: allTxns, transactionsLoading, routeTransaction, refreshTransactions } = useTransactions();
+  const { transactions: allTxns, transactionsLoading, routeTransaction, refreshTransactions, fetchGeneralPool } = useTransactions();
   const { stores } = useStores();
   const { user } = useAuth();
   const { present, dismiss } = useBottomSheet();
 
+  // GET /transactions (allTxns) only ever returns already-assigned payments
+  // — a payment captured by the notification listener lands in GENERAL
+  // first and stays invisible here until someone routes it to a store. That
+  // silence read as "the app isn't picking up the notification" even though
+  // it had, so "Hoy" additionally pulls in the GENERAL pool directly —
+  // "Pagos sin asignar" (general.tsx) still owns actually routing them.
+  const [generalPool, setGeneralPool] = useState<Transaction[]>([]);
+
+  const loadGeneralPool = useCallback(async () => {
+    try {
+      setGeneralPool(await fetchGeneralPool());
+    } catch {
+      // Silent — the assigned-only list above still loads and renders fine
+      // without it; a failed GENERAL fetch just means today's total may
+      // under-count unassigned payments until the next refresh succeeds.
+    }
+  }, [fetchGeneralPool]);
+
+  useEffect(() => { loadGeneralPool(); }, [loadGeneralPool]);
+
   function storeNameFor(storeId: string | null): string | null {
-    if (storeId === null) return null;
+    if (storeId === null) return t.common.generalPoolLabel;
     return stores.find(s => s.id === storeId)?.name ?? null;
   }
 
@@ -320,13 +340,23 @@ export default function DashboardScreen() {
     }
   }
 
+  async function handleRefreshAll() {
+    await Promise.all([refreshTransactions(), loadGeneralPool()]);
+  }
+
   const [sel, setSel] = useState<Sel>({
     diaY: hoy.getFullYear(), diaM: hoy.getMonth(), diaD: hoy.getDate(),
     semY: hoy.getFullYear(), semM: hoy.getMonth(), semN: 1, semS: 1, semE: 7,
     mesY: hoy.getFullYear(), mesM: hoy.getMonth(),
   });
 
-  const txnsAll  = useMemo(() => filtrar(allTxns, periodo, sel, hoy), [allTxns, periodo, sel]);
+  // Only "Hoy" folds in the GENERAL pool — Día/Semana/Mes stay assigned-only
+  // store-level reporting, same as before.
+  const baseTxns = useMemo(
+    () => (periodo === 'Hoy' ? [...allTxns, ...generalPool] : allTxns),
+    [allTxns, generalPool, periodo]
+  );
+  const txnsAll  = useMemo(() => filtrar(baseTxns, periodo, sel, hoy), [baseTxns, periodo, sel]);
   const txns     = periodo === 'Hoy' ? txnsAll.slice(0, 10) : txnsAll;
   const total    = txnsAll.reduce((s, t) => s + t.amount, 0);
 
@@ -472,7 +502,7 @@ export default function DashboardScreen() {
               {periodo === 'Hoy' ? t.dashboard.recentPayments : t.dashboard.periodPayments}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <RefreshButton onRefresh={refreshTransactions} size={30} />
+              <RefreshButton onRefresh={handleRefreshAll} size={30} />
               {txnsAll.length > 0 && (
                 <TouchableOpacity onPress={() => setVerTodos(true)}>
                   <Text style={{ color: Colors.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.dashboard.viewAll}</Text>

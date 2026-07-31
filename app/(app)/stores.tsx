@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Dimensions, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -35,6 +35,12 @@ const ALL_METHODS: StorePaymentMethod[] = ['yape', 'plin', 'izipay'];
 const METHOD_LABELS: Record<StorePaymentMethod, string> = { yape: 'Yape', plin: 'Plin', izipay: 'Izipay' };
 
 const EMPTY_REVENUE: StoreRevenue = { todayRevenue: 0, monthRevenue: 0, txnCount: 0 };
+
+// A percentage maxHeight resolves against this sheet's immediate parent,
+// which BottomSheetStore.tsx sizes by content rather than a fixed height —
+// that ambiguity showed up on Android as the sheet floating above the true
+// bottom edge with a visible gap below it. A pixel value has no such issue.
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 function StoreCard({ store, revenue, onPress }: { store: Store; revenue: StoreRevenue; onPress: () => void }) {
   const { c } = useTheme();
@@ -128,7 +134,7 @@ function StoreFormSheet({ onClose, initial, onSubmit, title }: {
 
   return (
     <View style={[styles.addSheet, {
-      backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: '85%',
+      backgroundColor: c.BACKGROUND_CARD, paddingBottom: insets.bottom + 20, maxHeight: SCREEN_HEIGHT * 0.85,
       shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
     }]}>
       <ScrollView keyboardShouldPersistTaps="handled">
@@ -237,6 +243,153 @@ export default function StoresScreen() {
     ]);
   }
 
+  // Store detail used to be its own <Modal> — a separate native Android
+  // window, which sat ABOVE the main app window that BottomSheetProvider's
+  // overlay lives in. Opening the add/edit sheet from here (via present())
+  // rendered it in the main window, one layer BEHIND the detail Modal's own
+  // window, so it looked like pressing "Editar" silently sent you back to
+  // the store list instead of opening a sheet in front of you. Rendering the
+  // detail view as a plain conditional return — same window as everything
+  // else — fixes that; BackHandler below replaces the Modal's built-in
+  // onRequestClose for the hardware back button.
+  useEffect(() => {
+    if (!selectedStore) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelectedStoreId(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [selectedStore]);
+
+  if (selectedStore) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
+        <StatusBar style={c.isDark ? 'light' : 'dark'} />
+        <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: c.BORDER }]}>
+          <TouchableOpacity onPress={() => setSelectedStoreId(null)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }]}>
+            <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
+          </TouchableOpacity>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={[styles.headerTitle, { color: c.TEXT_PRIMARY }]}>{selectedStore.name}</Text>
+            <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{selectedStore.address || t.stores.noAddress}</Text>
+          </View>
+          <View style={{ marginRight: isOwner ? 8 : 0 }}>
+            <RefreshButton onRefresh={refreshStoresView} size={38} />
+          </View>
+          {isOwner && (
+            <>
+              <TouchableOpacity onPress={() => openEditSheet(selectedStore)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
+                <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(selectedStore)} style={[styles.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
+                <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 + keyboardHeight }}>
+
+          {/* Account info */}
+          <View style={[styles.detailCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
+            <Text style={[styles.detailSectionLabel, { color: c.TEXT_SECONDARY }]}>{t.stores.notificationAccountLabel}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 }}>
+              <View style={[styles.accountIcon, { backgroundColor: `${c.ACCENT_CYAN}18` }]}>
+                <Ionicons name="mail-outline" size={18} color={c.ACCENT_CYAN} />
+              </View>
+              <Text style={[styles.accountEmail, { color: c.TEXT_PRIMARY }]}>{selectedStore.account || t.common.fallback.unassigned}</Text>
+            </View>
+          </View>
+
+          {/* Revenue */}
+          <View style={[styles.detailCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, marginTop: 12 }]}>
+            <Text style={[styles.detailSectionLabel, { color: c.TEXT_SECONDARY }]}>{t.stores.revenueLabel}</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+              {[
+                { label: t.stores.stats.today, value: formatAmount((revenueByStore[selectedStore.id] ?? EMPTY_REVENUE).todayRevenue), color: c.SUCCESS },
+                { label: t.stores.stats.thisMonth, value: formatAmount((revenueByStore[selectedStore.id] ?? EMPTY_REVENUE).monthRevenue), color: c.TEXT_PRIMARY },
+                { label: t.stores.stats.payments, value: String((revenueByStore[selectedStore.id] ?? EMPTY_REVENUE).txnCount), color: c.ACCENT_PURPLE },
+              ].map(item => (
+                <View key={item.label} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ color: item.color, fontSize: 16, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>{item.value}</Text>
+                  <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 }}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Assigned team */}
+          <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.assignedTeamLabel}</Text>
+          {team.filter(m => m.storeId === selectedStore.id || m.storeId === 'all').map(member => (
+            <View key={member.id} style={[styles.memberRow, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
+              <Avatar initials={member.initials} size="sm" color={c.ACCENT_PURPLE} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{member.name}</Text>
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular' }}>{member.email}</Text>
+              </View>
+              <View style={[styles.rolePill, {
+                backgroundColor: member.role === 'owner' ? `${c.ACCENT_PURPLE}20` : member.role === 'supervisor' ? `${c.ACCENT_CYAN}20` : `${c.SUCCESS}20`,
+                borderColor: member.role === 'owner' ? `${c.ACCENT_PURPLE}44` : member.role === 'supervisor' ? `${c.ACCENT_CYAN}44` : `${c.SUCCESS}44`,
+              }]}>
+                <Text style={[styles.roleText, { color: member.role === 'owner' ? c.ACCENT_PURPLE : member.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS }]}>
+                  {member.role === 'owner' ? t.common.roles.owner : member.role === 'supervisor' ? t.common.roles.supervisor : t.common.roles.cajero}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          {/* Payment methods */}
+          <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.paymentMethodsLabel}</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {selectedStore.methods.map(m => (
+              <View key={m} style={[styles.methodCard, { backgroundColor: `${PaymentColors[m]}15`, borderColor: `${PaymentColors[m]}40` }]}>
+                <Image source={METHOD_LOGOS[m]} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                <Text style={{ color: PaymentColors[m], fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
+                  {METHOD_LABELS[m]}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Payment history — already scoped by role from the backend
+              (cajero: today, supervisor: last 90 days, owner: unlimited),
+              so this just filters the already-loaded list by store. */}
+          <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.historyLabel}</Text>
+          <Input
+            placeholder={t.stores.historySearchPlaceholder}
+            value={historySearch}
+            onChangeText={setHistorySearch}
+            leftIcon="search-outline"
+          />
+          <View style={{ height: 10 }} />
+          {(() => {
+            const storeHistory = transactions.filter(txn => txn.storeId === selectedStore.id);
+            const query = historySearch.trim().toLowerCase();
+            const filteredHistory = query ? storeHistory.filter(txn => txn.payerName.toLowerCase().includes(query)) : storeHistory;
+            if (storeHistory.length === 0) {
+              return (
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
+                  {t.stores.noHistory}
+                </Text>
+              );
+            }
+            if (filteredHistory.length === 0) {
+              return (
+                <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
+                  {t.stores.noHistoryResults}
+                </Text>
+              );
+            }
+            return filteredHistory
+              .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+              .map(txn => (
+                <TransactionItem key={txn.id} transaction={txn} onPress={() => router.push(`/modals/transaction/${txn.id}`)} />
+              ));
+          })()}
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
       <StatusBar style={c.isDark ? 'light' : 'dark'} />
@@ -312,137 +465,6 @@ export default function StoresScreen() {
         </View>
 
       </ScrollView>
-
-      {/* Store detail modal */}
-      <Modal visible={!!selectedStore} animationType="slide" onRequestClose={() => setSelectedStoreId(null)} statusBarTranslucent navigationBarTranslucent>
-        {selectedStore && (
-          <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
-            <StatusBar style={c.isDark ? 'light' : 'dark'} />
-            <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: c.BORDER }]}>
-              <TouchableOpacity onPress={() => setSelectedStoreId(null)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER }]}>
-                <Ionicons name="arrow-back" size={20} color={c.TEXT_PRIMARY} />
-              </TouchableOpacity>
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={[styles.headerTitle, { color: c.TEXT_PRIMARY }]}>{selectedStore.name}</Text>
-                <Text style={[styles.headerSub, { color: c.TEXT_SECONDARY }]}>{selectedStore.address || t.stores.noAddress}</Text>
-              </View>
-              <View style={{ marginRight: isOwner ? 8 : 0 }}>
-                <RefreshButton onRefresh={refreshStoresView} size={38} />
-              </View>
-              {isOwner && (
-                <>
-                  <TouchableOpacity onPress={() => openEditSheet(selectedStore)} style={[styles.backBtn, { backgroundColor: c.BACKGROUND_CARD_2, borderColor: c.BORDER, marginRight: 8 }]}>
-                    <Ionicons name="pencil-outline" size={18} color={c.TEXT_PRIMARY} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(selectedStore)} style={[styles.backBtn, { backgroundColor: `${c.ACCENT_RED}18`, borderColor: `${c.ACCENT_RED}44` }]}>
-                    <Ionicons name="trash-outline" size={18} color={c.ACCENT_RED} />
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 + keyboardHeight }}>
-
-              {/* Account info */}
-              <View style={[styles.detailCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
-                <Text style={[styles.detailSectionLabel, { color: c.TEXT_SECONDARY }]}>{t.stores.notificationAccountLabel}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 }}>
-                  <View style={[styles.accountIcon, { backgroundColor: `${c.ACCENT_CYAN}18` }]}>
-                    <Ionicons name="mail-outline" size={18} color={c.ACCENT_CYAN} />
-                  </View>
-                  <Text style={[styles.accountEmail, { color: c.TEXT_PRIMARY }]}>{selectedStore.account || t.common.fallback.unassigned}</Text>
-                </View>
-              </View>
-
-              {/* Revenue */}
-              <View style={[styles.detailCard, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER, marginTop: 12 }]}>
-                <Text style={[styles.detailSectionLabel, { color: c.TEXT_SECONDARY }]}>{t.stores.revenueLabel}</Text>
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
-                  {[
-                    { label: t.stores.stats.today, value: formatAmount((revenueByStore[selectedStore.id] ?? EMPTY_REVENUE).todayRevenue), color: c.SUCCESS },
-                    { label: t.stores.stats.thisMonth, value: formatAmount((revenueByStore[selectedStore.id] ?? EMPTY_REVENUE).monthRevenue), color: c.TEXT_PRIMARY },
-                    { label: t.stores.stats.payments, value: String((revenueByStore[selectedStore.id] ?? EMPTY_REVENUE).txnCount), color: c.ACCENT_PURPLE },
-                  ].map(item => (
-                    <View key={item.label} style={{ flex: 1, alignItems: 'center' }}>
-                      <Text style={{ color: item.color, fontSize: 16, fontWeight: '700', fontFamily: 'Inter_700Bold' }}>{item.value}</Text>
-                      <Text style={{ color: c.TEXT_SECONDARY, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 }}>{item.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* Assigned team */}
-              <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.assignedTeamLabel}</Text>
-              {team.filter(m => m.storeId === selectedStore.id || m.storeId === 'all').map(member => (
-                <View key={member.id} style={[styles.memberRow, { backgroundColor: c.BACKGROUND_CARD, borderColor: c.BORDER }]}>
-                  <Avatar initials={member.initials} size="sm" color={c.ACCENT_PURPLE} />
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={{ color: c.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>{member.name}</Text>
-                    <Text style={{ color: c.TEXT_SECONDARY, fontSize: 12, fontFamily: 'Inter_400Regular' }}>{member.email}</Text>
-                  </View>
-                  <View style={[styles.rolePill, {
-                    backgroundColor: member.role === 'owner' ? `${c.ACCENT_PURPLE}20` : member.role === 'supervisor' ? `${c.ACCENT_CYAN}20` : `${c.SUCCESS}20`,
-                    borderColor: member.role === 'owner' ? `${c.ACCENT_PURPLE}44` : member.role === 'supervisor' ? `${c.ACCENT_CYAN}44` : `${c.SUCCESS}44`,
-                  }]}>
-                    <Text style={[styles.roleText, { color: member.role === 'owner' ? c.ACCENT_PURPLE : member.role === 'supervisor' ? c.ACCENT_CYAN : c.SUCCESS }]}>
-                      {member.role === 'owner' ? t.common.roles.owner : member.role === 'supervisor' ? t.common.roles.supervisor : t.common.roles.cajero}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-
-              {/* Payment methods */}
-              <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.paymentMethodsLabel}</Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                {selectedStore.methods.map(m => (
-                  <View key={m} style={[styles.methodCard, { backgroundColor: `${PaymentColors[m]}15`, borderColor: `${PaymentColors[m]}40` }]}>
-                    <Image source={METHOD_LOGOS[m]} style={{ width: 32, height: 32 }} resizeMode="contain" />
-                    <Text style={{ color: PaymentColors[m], fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginTop: 6 }}>
-                      {METHOD_LABELS[m]}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Payment history — already scoped by role from the backend
-                  (cajero: today, supervisor: last 90 days, owner: unlimited),
-                  so this just filters the already-loaded list by store. */}
-              <Text style={[styles.sectionTitle, { color: c.TEXT_SECONDARY, marginTop: 20, marginBottom: 10 }]}>{t.stores.historyLabel}</Text>
-              <Input
-                placeholder={t.stores.historySearchPlaceholder}
-                value={historySearch}
-                onChangeText={setHistorySearch}
-                leftIcon="search-outline"
-              />
-              <View style={{ height: 10 }} />
-              {(() => {
-                const storeHistory = transactions.filter(txn => txn.storeId === selectedStore.id);
-                const query = historySearch.trim().toLowerCase();
-                const filteredHistory = query ? storeHistory.filter(txn => txn.payerName.toLowerCase().includes(query)) : storeHistory;
-                if (storeHistory.length === 0) {
-                  return (
-                    <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
-                      {t.stores.noHistory}
-                    </Text>
-                  );
-                }
-                if (filteredHistory.length === 0) {
-                  return (
-                    <Text style={{ color: c.TEXT_SECONDARY, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 20 }}>
-                      {t.stores.noHistoryResults}
-                    </Text>
-                  );
-                }
-                return filteredHistory
-                  .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-                  .map(txn => (
-                    <TransactionItem key={txn.id} transaction={txn} onPress={() => router.push(`/modals/transaction/${txn.id}`)} />
-                  ));
-              })()}
-            </ScrollView>
-          </View>
-        )}
-      </Modal>
-
     </View>
   );
 }
@@ -482,7 +504,7 @@ const styles = StyleSheet.create({
   rolePill: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
   roleText: { fontSize: 11, fontWeight: '600', fontFamily: 'Inter_600SemiBold' },
   methodCard: { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, minWidth: 80 },
-  addSheet: { borderTopLeftRadius: 32, borderTopRightRadius: 20, padding: 24, maxHeight: '88%' },
+  addSheet: { borderTopLeftRadius: 32, borderTopRightRadius: 20, padding: 24, maxHeight: SCREEN_HEIGHT * 0.88 },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetTitle: { fontSize: 18, fontWeight: '700', fontFamily: 'Inter_700Bold', marginBottom: 16 },
 });

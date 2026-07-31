@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Platform, AppState, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,12 @@ const PLIN_BANKS: { key: PlinBank; label: string }[] = [
   { key: 'interbank', label: 'Interbank' },
   { key: 'scotiabank', label: 'Scotiabank Perú' },
 ];
+
+// A percentage maxHeight resolves against this sheet's immediate parent,
+// which BottomSheetStore.tsx sizes by content rather than a fixed height —
+// that ambiguity showed up on Android as the sheet floating above the true
+// bottom edge with a visible gap below it. A pixel value has no such issue.
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 function ToggleRow({ icon, label, value, onValueChange }: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -325,7 +331,7 @@ function ChangelogSheetContent({ onClose }: { onClose: () => void }) {
   return (
     <View style={{
       backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '80%',
+      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: SCREEN_HEIGHT * 0.8,
       shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
     }}>
       <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 20 }} />

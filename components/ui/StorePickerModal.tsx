@@ -1,10 +1,16 @@
 import { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../constants/theme';
 import { useTranslation } from '../../store/LocaleStore';
 import Input from './Input';
+
+// A percentage maxHeight resolves against this sheet's immediate parent,
+// which BottomSheetStore.tsx sizes by content rather than a fixed height —
+// that ambiguity showed up on Android as the sheet floating above the true
+// bottom edge with a visible gap below it. A pixel value has no such issue.
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 export interface StorePickerOption {
   id: string | null;
@@ -44,7 +50,7 @@ export default function StorePickerModal({ onClose, options, selectedId, onSelec
   return (
     <View style={{
       backgroundColor: c.BACKGROUND_CARD, borderTopLeftRadius: 32, borderTopRightRadius: 20,
-      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: '80%',
+      padding: 24, paddingBottom: insets.bottom + 20, maxHeight: SCREEN_HEIGHT * 0.8,
       shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 24,
     }}>
       <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.BORDER, alignSelf: 'center', marginBottom: 16 }} />
