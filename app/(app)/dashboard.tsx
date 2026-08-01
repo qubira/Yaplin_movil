@@ -351,11 +351,16 @@ export default function DashboardScreen() {
   });
 
   // Only "Hoy" folds in the GENERAL pool — Día/Semana/Mes stay assigned-only
-  // store-level reporting, same as before.
-  const baseTxns = useMemo(
-    () => (periodo === 'Hoy' ? [...allTxns, ...generalPool] : allTxns),
-    [allTxns, generalPool, periodo]
-  );
+  // store-level reporting, same as before. allTxns and generalPool come
+  // from two independently-timed fetches, so a payment that got routed to a
+  // store in the gap between them can briefly show up in BOTH — dedupe by
+  // id and keep the allTxns (assigned) copy, since it's the more current one.
+  const baseTxns = useMemo(() => {
+    if (periodo !== 'Hoy') return allTxns;
+    const assignedIds = new Set(allTxns.map(t => t.id));
+    const stillUnassigned = generalPool.filter(t => !assignedIds.has(t.id));
+    return [...allTxns, ...stillUnassigned];
+  }, [allTxns, generalPool, periodo]);
   const txnsAll  = useMemo(() => filtrar(baseTxns, periodo, sel, hoy), [baseTxns, periodo, sel]);
   const txns     = periodo === 'Hoy' ? txnsAll.slice(0, 10) : txnsAll;
   const total    = txnsAll.reduce((s, t) => s + t.amount, 0);

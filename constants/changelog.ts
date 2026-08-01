@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3',
+    date: '1 ago 2026',
+    changes: [
+      {
+        es: 'Se corrigió que un pago apareciera duplicado (y contado dos veces en el total) en el Dashboard de "Hoy" justo cuando se asignaba a una tienda.',
+        en: 'Fixed a payment appearing duplicated (and counted twice in the total) on the "Today" Dashboard right when it was assigned to a store.',
+      },
+    ],
+  },
+  {
     version: '1.2',
     date: '1 ago 2026',
     changes: [
