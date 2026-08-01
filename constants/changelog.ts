@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.6',
+    date: '1 ago 2026',
+    changes: [
+      {
+        es: 'El Historial de actualizaciones ahora es una pantalla completa (con botón de regresar) en vez de una hoja pequeña, para que sea más fácil desplazarse por la lista.',
+        en: 'Update History is now a full screen (with a back button) instead of a small sheet, making the list much easier to scroll through.',
+      },
+    ],
+  },
+  {
     version: '1.5',
     date: '1 ago 2026',
     changes: [
