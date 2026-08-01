@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2',
+    date: '1 ago 2026',
+    changes: [
+      {
+        es: 'Se corrigió que la lista del Historial de actualizaciones no se dejaba desplazar bien hacia arriba/abajo.',
+        en: 'Fixed the Update History list not scrolling up/down properly.',
+      },
+    ],
+  },
+  {
     version: '1.1',
     date: '1 ago 2026',
     changes: [

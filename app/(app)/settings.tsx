@@ -343,7 +343,7 @@ function ChangelogSheetContent({ onClose }: { onClose: () => void }) {
           {t.settings.changelogModal.empty}
         </Text>
       ) : (
-        <ScrollView keyboardShouldPersistTaps="handled">
+        <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: SCREEN_HEIGHT * 0.55 }}>
           {CHANGELOG.map((entry, i) => (
             <View key={entry.version} style={{
               paddingBottom: 16, marginBottom: 16,
