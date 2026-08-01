@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Image, Alert, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
@@ -135,41 +135,24 @@ export default function GeneralScreen() {
   const t = useTranslation();
   const { user } = useAuth();
   const { stores } = useStores();
-  const { fetchGeneralPool, routeTransaction } = useTransactions();
-
-  const [items, setItems] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Reads the same generalPool PaymentsStore already polls for Dashboard —
+  // no independent fetch here anymore, so this screen and Dashboard can
+  // never show two different snapshots of "what's unassigned right now".
+  const { generalPool: items, transactionsLoading: loading, refreshTransactions, routeTransaction } = useTransactions();
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const { present, dismiss } = useBottomSheet();
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setLoadError(false);
-    try {
-      const remote = await fetchGeneralPool();
-      setItems(remote);
-    } catch {
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [fetchGeneralPool]);
-
-  useEffect(() => { load(); }, [load]);
-
   async function handleRefresh() {
     setRefreshing(true);
-    await load(true);
+    await refreshTransactions().catch(() => {});
+    setRefreshing(false);
   }
 
   async function assign(txn: Transaction, toStoreId: string) {
     setAssigningId(txn.id);
     try {
       await routeTransaction(txn.id, toStoreId, txn.version);
-      setItems(prev => prev.filter(x => x.id !== txn.id));
       dismiss();
     } catch (e) {
       Alert.alert('', e instanceof ApiError ? e.message : t.general.loadError);
@@ -203,7 +186,7 @@ export default function GeneralScreen() {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <RefreshButton onRefresh={() => load()} />
+          <RefreshButton onRefresh={handleRefresh} />
           {user?.role === 'owner' && (
             <TouchableOpacity onPress={() => router.push('/(app)/manual-entry')}
               style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: c.ACCENT_PURPLE, alignItems: 'center', justifyContent: 'center' }}>
@@ -220,8 +203,6 @@ export default function GeneralScreen() {
       >
         {loading ? (
           <BrandLoader />
-        ) : loadError ? (
-          <EmptyState icon="alert-circle-outline" title={t.general.loadError} />
         ) : items.length === 0 ? (
           <EmptyState icon="layers-outline" title={t.general.empty.title} description={t.general.empty.description} />
         ) : (

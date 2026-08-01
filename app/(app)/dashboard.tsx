@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Modal, StyleSheet, Dimensions, Image, Alert,
@@ -23,6 +23,7 @@ import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import BrandLoader from '../../components/ui/BrandLoader';
 import RefreshButton from '../../components/ui/RefreshButton';
+import StorePickerModal from '../../components/ui/StorePickerModal';
 
 // Local, device-time approximation of "today" — same convention already
 // used by routeOptions() in app/modals/transaction/[id].tsx: the client only
@@ -301,30 +302,18 @@ export default function DashboardScreen() {
 
   const [periodo, setPeriodo]         = useState<Period>('Hoy');
   const [verTodos, setVerTodos]       = useState(false);
-  const { transactions: allTxns, transactionsLoading, routeTransaction, refreshTransactions, fetchGeneralPool } = useTransactions();
+  // Dashboard is the single source of truth for both assigned and unassigned
+  // payments now — Pagos sin asignar (general.tsx, supervisor/cajero only)
+  // just filters the same shared PaymentsStore state instead of running its
+  // own independent fetch, and this screen owns actually routing an
+  // unassigned payment to a store (via the "Monto sin asignar" filter below)
+  // for the owner, who no longer has a separate tab for that.
+  const { transactions: allTxns, generalPool, transactionsLoading, routeTransaction, refreshTransactions } = useTransactions();
   const { stores } = useStores();
   const { user } = useAuth();
   const { present, dismiss } = useBottomSheet();
 
-  // GET /transactions (allTxns) only ever returns already-assigned payments
-  // — a payment captured by the notification listener lands in GENERAL
-  // first and stays invisible here until someone routes it to a store. That
-  // silence read as "the app isn't picking up the notification" even though
-  // it had, so "Hoy" additionally pulls in the GENERAL pool directly —
-  // "Pagos sin asignar" (general.tsx) still owns actually routing them.
-  const [generalPool, setGeneralPool] = useState<Transaction[]>([]);
-
-  const loadGeneralPool = useCallback(async () => {
-    try {
-      setGeneralPool(await fetchGeneralPool());
-    } catch {
-      // Silent — the assigned-only list above still loads and renders fine
-      // without it; a failed GENERAL fetch just means today's total may
-      // under-count unassigned payments until the next refresh succeeds.
-    }
-  }, [fetchGeneralPool]);
-
-  useEffect(() => { loadGeneralPool(); }, [loadGeneralPool]);
+  const [storeFilter, setStoreFilter] = useState<'all' | 'unassigned' | string>('all');
 
   function storeNameFor(storeId: string | null): string | null {
     if (storeId === null) return t.common.generalPoolLabel;
@@ -334,14 +323,29 @@ export default function DashboardScreen() {
   async function handleReturnToGeneral(txn: Transaction) {
     try {
       await routeTransaction(txn.id, null, txn.version);
-      await refreshTransactions();
     } catch (e) {
       Alert.alert('', e instanceof ApiError ? e.message : t.general.loadError);
     }
   }
 
-  async function handleRefreshAll() {
-    await Promise.all([refreshTransactions(), loadGeneralPool()]);
+  async function assignToStore(txn: Transaction, toStoreId: string) {
+    try {
+      await routeTransaction(txn.id, toStoreId, txn.version);
+      dismiss();
+    } catch (e) {
+      Alert.alert('', e instanceof ApiError ? e.message : t.general.loadError);
+    }
+  }
+
+  function openAssignPicker(txn: Transaction) {
+    present(
+      <StorePickerModal
+        onClose={dismiss}
+        title={t.general.pickStoreTitle}
+        options={stores.map(s => ({ id: s.id, name: s.name }))}
+        onSelect={(option) => { if (option.id) assignToStore(txn, option.id); }}
+      />
+    );
   }
 
   const [sel, setSel] = useState<Sel>({
@@ -350,18 +354,24 @@ export default function DashboardScreen() {
     mesY: hoy.getFullYear(), mesM: hoy.getMonth(),
   });
 
-  // Only "Hoy" folds in the GENERAL pool — Día/Semana/Mes stay assigned-only
-  // store-level reporting, same as before. allTxns and generalPool come
-  // from two independently-timed fetches, so a payment that got routed to a
-  // store in the gap between them can briefly show up in BOTH — dedupe by
-  // id and keep the allTxns (assigned) copy, since it's the more current one.
+  // allTxns and generalPool are now fetched together in the same refresh
+  // cycle (see PaymentsStore.tsx), but a defensive id-dedupe stays cheap
+  // insurance against the tiny window between the two parallel requests
+  // resolving — keep the allTxns (assigned) copy if a payment is ever in
+  // both.
   const baseTxns = useMemo(() => {
-    if (periodo !== 'Hoy') return allTxns;
     const assignedIds = new Set(allTxns.map(t => t.id));
     const stillUnassigned = generalPool.filter(t => !assignedIds.has(t.id));
     return [...allTxns, ...stillUnassigned];
-  }, [allTxns, generalPool, periodo]);
-  const txnsAll  = useMemo(() => filtrar(baseTxns, periodo, sel, hoy), [baseTxns, periodo, sel]);
+  }, [allTxns, generalPool]);
+
+  const storeFilteredTxns = useMemo(() => {
+    if (storeFilter === 'all') return baseTxns;
+    if (storeFilter === 'unassigned') return baseTxns.filter(t => t.storeId === null);
+    return baseTxns.filter(t => t.storeId === storeFilter);
+  }, [baseTxns, storeFilter]);
+
+  const txnsAll  = useMemo(() => filtrar(storeFilteredTxns, periodo, sel, hoy), [storeFilteredTxns, periodo, sel]);
   const txns     = periodo === 'Hoy' ? txnsAll.slice(0, 10) : txnsAll;
   const total    = txnsAll.reduce((s, t) => s + t.amount, 0);
 
@@ -500,6 +510,27 @@ export default function DashboardScreen() {
           </LinearGradient>
         </View>
 
+        {/* Store filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 16 }}>
+          {([{ id: 'all', name: t.dashboard.storeFilter.all }, ...stores.map(s => ({ id: s.id, name: s.name })), { id: 'unassigned', name: t.dashboard.storeFilter.unassigned }] as { id: string; name: string }[]).map(opt => {
+            const active = storeFilter === opt.id;
+            return (
+              <TouchableOpacity key={opt.id} onPress={() => setStoreFilter(opt.id as 'all' | 'unassigned' | string)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
+                  backgroundColor: active ? Colors.ACCENT_PURPLE : Colors.BACKGROUND_CARD, borderColor: active ? Colors.ACCENT_PURPLE : Colors.BORDER,
+                }}>
+                {opt.id === 'unassigned' && (
+                  <Ionicons name="layers-outline" size={13} color={active ? '#fff' : Colors.TEXT_SECONDARY} />
+                )}
+                <Text style={{ color: active ? '#fff' : Colors.TEXT_SECONDARY, fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                  {opt.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
         {/* Transaction list */}
         <View style={{ paddingHorizontal: 24 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
@@ -507,7 +538,7 @@ export default function DashboardScreen() {
               {periodo === 'Hoy' ? t.dashboard.recentPayments : t.dashboard.periodPayments}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <RefreshButton onRefresh={handleRefreshAll} size={30} />
+              <RefreshButton onRefresh={refreshTransactions} size={30} />
               {txnsAll.length > 0 && (
                 <TouchableOpacity onPress={() => setVerTodos(true)}>
                   <Text style={{ color: Colors.ACCENT_CYAN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.dashboard.viewAll}</Text>
@@ -527,17 +558,31 @@ export default function DashboardScreen() {
             </View>
           ) : (
             txns.map(txn => (
-              <TransactionItem
-                key={txn.id}
-                transaction={txn}
-                onPress={() => router.push(`/modals/transaction/${txn.id}`)}
-                storeName={storeNameFor(txn.storeId)}
-                onReturnToGeneral={
-                  user?.role === 'supervisor' && txn.storeId === user.storeId && isTodayLocal(txn.timestamp)
-                    ? () => handleReturnToGeneral(txn)
-                    : undefined
-                }
-              />
+              <View key={txn.id}>
+                <TransactionItem
+                  transaction={txn}
+                  onPress={() => router.push(`/modals/transaction/${txn.id}`)}
+                  storeName={storeNameFor(txn.storeId)}
+                  onReturnToGeneral={
+                    user?.role === 'supervisor' && txn.storeId === user.storeId && isTodayLocal(txn.timestamp)
+                      ? () => handleReturnToGeneral(txn)
+                      : undefined
+                  }
+                />
+                {txn.storeId === null && (
+                  <TouchableOpacity onPress={() => openAssignPicker(txn)} activeOpacity={0.85}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 12,
+                      backgroundColor: `${Colors.ACCENT_PURPLE}18`, borderWidth: 1, borderColor: `${Colors.ACCENT_PURPLE}44`,
+                      marginTop: -2, marginBottom: 10,
+                    }}>
+                    <Ionicons name="business-outline" size={14} color={Colors.ACCENT_PURPLE} />
+                    <Text style={{ color: Colors.ACCENT_PURPLE, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                      {t.general.assignTo}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ))
           )}
         </View>
@@ -650,6 +695,19 @@ export default function DashboardScreen() {
                   {txnsAll.map((txn, i) => (
                     <View key={txn.id} style={i < txnsAll.length - 1 ? { borderBottomWidth: 1, borderBottomColor: Colors.BORDER } : undefined}>
                       <VerTodosRow txn={txn} onPress={() => goToDetail(txn.id)} storeName={storeNameFor(txn.storeId)} />
+                      {txn.storeId === null && (
+                        <TouchableOpacity onPress={() => openAssignPicker(txn)} activeOpacity={0.85}
+                          style={{
+                            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 10,
+                            backgroundColor: `${Colors.ACCENT_PURPLE}18`, borderWidth: 1, borderColor: `${Colors.ACCENT_PURPLE}44`,
+                            marginBottom: 10,
+                          }}>
+                          <Ionicons name="business-outline" size={13} color={Colors.ACCENT_PURPLE} />
+                          <Text style={{ color: Colors.ACCENT_PURPLE, fontSize: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' }}>
+                            {t.general.assignTo}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ))}
                 </View>

@@ -156,6 +156,10 @@ const es = {
       viewDay: (day: number, month: string, year: number) => `Ver ${day} ${month} ${year}`,
       weekN: (n: number) => `Semana ${n}`,
     },
+    storeFilter: {
+      all: 'Todas las tiendas',
+      unassigned: 'Monto sin asignar',
+    },
   },
 
   team: {

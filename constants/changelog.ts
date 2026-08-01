@@ -10,6 +10,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.5',
+    date: '1 ago 2026',
+    changes: [
+      {
+        es: 'Rediseño de navegación: el Dashboard ahora muestra pagos asignados y sin asignar juntos, con un filtro por tienda (incluyendo "Monto sin asignar") desde donde el dueño puede asignarlos directamente.',
+        en: 'Navigation redesign: the Dashboard now shows assigned and unassigned payments together, with a store filter (including "Unassigned amount") the owner can assign payments from directly.',
+      },
+      {
+        es: '"Pagos sin asignar" ahora solo la ven supervisores y cajeros; el dueño usa el Dashboard en su lugar.',
+        en: '"Pagos sin asignar" (Unassigned Payments) is now only visible to supervisors and cashiers; the owner uses the Dashboard instead.',
+      },
+      {
+        es: 'Supervisores y cajeros ya no ven el Dashboard — su pantalla principal ahora es "Pagos sin asignar".',
+        en: 'Supervisors and cashiers no longer see the Dashboard — their main screen is now "Pagos sin asignar" (Unassigned Payments).',
+      },
+      {
+        es: 'Se corrigió que un pago apareciera brevemente duplicado en el conteo justo al registrarse (subía y luego regresaba al número correcto) — ahora el Dashboard y Pagos sin asignar siempre leen la misma información.',
+        en: 'Fixed a payment briefly inflating the count right when it was captured (count would jump up then settle back down) — Dashboard and Pagos sin asignar now always read from the same data.',
+      },
+    ],
+  },
+  {
     version: '1.4',
     date: '1 ago 2026',
     changes: [

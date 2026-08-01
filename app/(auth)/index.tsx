@@ -24,7 +24,10 @@ export default function AuthScreen() {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
 
-  if (user) return <Redirect href="/(app)/dashboard" />;
+  // Dashboard is owner-only now (Pagos sin asignar took over as the primary
+  // payments screen for supervisor/cajero) — land each role on whichever
+  // tab is actually visible to them, not a tab hidden from their tab bar.
+  if (user) return <Redirect href={user.role === 'owner' ? '/(app)/dashboard' : '/(app)/general'} />;
 
   async function handleLogin() {
     if (!email.trim() || !password) {

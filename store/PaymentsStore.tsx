@@ -112,6 +112,11 @@ export interface ManualTransactionInput {
 
 interface PaymentsCtxValue {
   transactions: Transaction[];
+  // Unassigned (GENERAL pool) payments — fetched together with `transactions`
+  // on the same refresh cycle so Dashboard and Pagos sin asignar are always
+  // looking at the same snapshot instead of two independently-timed fetches
+  // that could briefly disagree with each other.
+  generalPool: Transaction[];
   hydrated: boolean;
   transactionsLoading: boolean;
   refreshTransactions: () => Promise<void>;
@@ -120,7 +125,6 @@ interface PaymentsCtxValue {
   routeTransaction: (id: string, toStoreId: string | null, version: number) => Promise<Transaction>;
   correctAmount: (id: string, delta: number, reason: string, version: number, confirm: ConfirmationInput) => Promise<Transaction>;
   createManualTransaction: (input: ManualTransactionInput) => Promise<Transaction>;
-  fetchGeneralPool: () => Promise<Transaction[]>;
   fetchTransactionEvents: (id: string) => Promise<TransactionEvent[]>;
   fetchTransactionById: (id: string) => Promise<Transaction>;
   integrations: IntegrationsState;
@@ -138,6 +142,7 @@ const PaymentsContext = createContext<PaymentsCtxValue | null>(null);
 export function PaymentsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [generalPool, setGeneralPool] = useState<Transaction[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationsState>(DEFAULT_INTEGRATIONS);
   const [preferences, setPreferences] = useState<PreferencesState>(DEFAULT_PREFERENCES);
   const [hydrated, setHydrated] = useState(false);
@@ -183,6 +188,7 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   const refreshTransactions = useCallback(async () => {
     if (!user) {
       setTransactions([]);
+      setGeneralPool([]);
       setTransactionsLoading(false);
       prevStoreIdByIdRef.current = null;
       return;
@@ -191,8 +197,17 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     // poll below must stay silent, or the indicator would flicker constantly.
     if (!hasLoadedTransactionsOnceRef.current) setTransactionsLoading(true);
     try {
-      const remote = await api.get<RemoteTransaction[]>('/transactions');
+      // Fetched together (same Promise.all tick) rather than on two separate
+      // timers — Dashboard (assigned + unassigned combined) and Pagos sin
+      // asignar (unassigned only) both read from this single snapshot, so
+      // they can't disagree with each other the way two independently-timed
+      // fetches could.
+      const [remote, remoteGeneral] = await Promise.all([
+        api.get<RemoteTransaction[]>('/transactions'),
+        api.get<RemoteTransaction[]>('/transactions/general'),
+      ]);
       const next = remote.map(fromRemote);
+      const nextGeneral = remoteGeneral.map(fromRemote);
 
       if (user.role !== 'owner' && prevStoreIdByIdRef.current) {
         const prevStoreById = prevStoreIdByIdRef.current;
@@ -226,6 +241,7 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
       prevStoreIdByIdRef.current = new Map(next.map((txn) => [txn.id, txn.storeId]));
 
       setTransactions(next);
+      setGeneralPool(nextGeneral);
     } finally {
       hasLoadedTransactionsOnceRef.current = true;
       setTransactionsLoading(false);
@@ -249,16 +265,20 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PaymentsCtxValue>(() => ({
     transactions,
+    generalPool,
     hydrated,
     transactionsLoading,
     refreshTransactions,
     addTransaction: async (t) => {
-      setTransactions(prev => (
-        prev.some(x => x.id === t.id) ? prev : [t, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-      ));
-      // storeId is deliberately NOT sent — under the GENERAL-pool model the
-      // backend always decides unassigned-vs-auto-assign on its own, and any
-      // storeId here would be silently ignored server-side anyway.
+      // No optimistic pre-add: a freshly-captured payment's eventual
+      // storeId (unassigned vs. auto-assigned to a business's one active
+      // store) is decided by the backend, not the client — guessing wrong
+      // meant placing it in `transactions` when it was actually unassigned,
+      // which then visibly popped back out once the next poll's
+      // correctly-scoped list replaced it (reported as payments briefly
+      // duplicating/inflating the count then "regularizing"). Waiting for
+      // the server's response and placing it in the list it actually
+      // belongs to avoids that flicker entirely.
       const saved = await api.post<RemoteTransaction>('/transactions', {
         payerName: t.payerName,
         payerInitials: t.payerInitials,
@@ -268,7 +288,14 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
         reference: t.reference,
         status: t.status,
       });
-      setTransactions(prev => prev.map(x => (x.id === t.id ? fromRemote(saved) : x)));
+      const created = fromRemote(saved);
+      if (created.storeId === null) {
+        setGeneralPool(prev => (prev.some(x => x.id === created.id) ? prev : [created, ...prev]));
+      } else {
+        setTransactions(prev => (
+          prev.some(x => x.id === created.id) ? prev : [created, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        ));
+      }
     },
     markAllRead: () => {
       setTransactions(prev => prev.map(t => (t.read ? t : { ...t, read: true })));
@@ -277,7 +304,20 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     routeTransaction: async (id, toStoreId, version) => {
       const saved = await api.post<RemoteTransaction>(`/transactions/${id}/route`, { toStoreId, version });
       const updated = fromRemote(saved);
-      setTransactions(prev => prev.map(x => (x.id === id ? updated : x)));
+      // Moves the transaction between the two lists to match its new
+      // storeId — routing INTO a store takes it out of generalPool, routing
+      // back to GENERAL (storeId null) takes it out of transactions.
+      if (updated.storeId === null) {
+        setTransactions(prev => prev.filter(x => x.id !== id));
+        setGeneralPool(prev => (prev.some(x => x.id === id) ? prev.map(x => (x.id === id ? updated : x)) : [updated, ...prev]));
+      } else {
+        setGeneralPool(prev => prev.filter(x => x.id !== id));
+        setTransactions(prev => (
+          prev.some(x => x.id === id)
+            ? prev.map(x => (x.id === id ? updated : x))
+            : [updated, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        ));
+      }
       return updated;
     },
     correctAmount: async (id, delta, reason, version, confirm) => {
@@ -292,10 +332,6 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
       setTransactions(prev => [created, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
       return created;
     },
-    fetchGeneralPool: async () => {
-      const remote = await api.get<RemoteTransaction[]>('/transactions/general');
-      return remote.map(fromRemote);
-    },
     fetchTransactionEvents: (id) => api.get<TransactionEvent[]>(`/transactions/${id}/events`),
     // GET /transactions only returns already-assigned payments, so anything
     // still sitting in GENERAL is never in the shared `transactions` list —
@@ -309,7 +345,7 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     setVoiceEnabled: (v) => setPreferences(prev => ({ ...prev, voiceEnabled: v })),
     setPushEnabled: (v) => setPreferences(prev => ({ ...prev, pushEnabled: v })),
     setCaptureActive: (v) => setPreferences(prev => ({ ...prev, captureActive: v })),
-  }), [transactions, hydrated, transactionsLoading, refreshTransactions, integrations, preferences]);
+  }), [transactions, generalPool, hydrated, transactionsLoading, refreshTransactions, integrations, preferences]);
 
   return <PaymentsContext.Provider value={value}>{children}</PaymentsContext.Provider>;
 }
@@ -322,12 +358,12 @@ function usePaymentsContext(): PaymentsCtxValue {
 
 export function useTransactions() {
   const {
-    transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
-    routeTransaction, correctAmount, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
+    transactions, generalPool, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
+    routeTransaction, correctAmount, createManualTransaction, fetchTransactionEvents, fetchTransactionById,
   } = usePaymentsContext();
   return {
-    transactions, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
-    routeTransaction, correctAmount, createManualTransaction, fetchGeneralPool, fetchTransactionEvents, fetchTransactionById,
+    transactions, generalPool, hydrated, transactionsLoading, refreshTransactions, addTransaction, markAllRead,
+    routeTransaction, correctAmount, createManualTransaction, fetchTransactionEvents, fetchTransactionById,
   };
 }
 

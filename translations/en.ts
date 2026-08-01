@@ -158,6 +158,10 @@ const en: typeof es = {
       viewDay: (day: number, month: string, year: number) => `View ${month} ${day}, ${year}`,
       weekN: (n: number) => `Week ${n}`,
     },
+    storeFilter: {
+      all: 'All stores',
+      unassigned: 'Unassigned amount',
+    },
   },
 
   team: {

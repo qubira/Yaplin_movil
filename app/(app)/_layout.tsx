@@ -32,6 +32,8 @@ export default function AppLayout() {
 
   if (hydrated && !user) return <Redirect href="/(auth)" />;
 
+  const isOwner = user?.role === 'owner';
+
   return (
     <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>
       <SubscriptionBanner subscription={user?.subscription} />
@@ -52,9 +54,15 @@ export default function AppLayout() {
           tabBarItemStyle: { flex: 1, alignItems: 'center', justifyContent: 'center' },
         }}
       >
+        {/* Dashboard is now the owner's single source of truth for both
+            assigned and unassigned payments (with a store filter, including
+            "Monto sin asignar", replacing what Pagos sin asignar did for
+            them) — hidden for supervisor/cajero, who get Pagos sin asignar
+            instead as their operational payments screen. */}
         <Tabs.Screen
           name="dashboard"
           options={{
+            href: isOwner ? undefined : null,
             tabBarIcon: ({ focused, color }) => (
               <TabIcon name={focused ? 'grid' : 'grid-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
             ),
@@ -63,6 +71,7 @@ export default function AppLayout() {
         <Tabs.Screen
           name="general"
           options={{
+            href: isOwner ? null : undefined,
             tabBarIcon: ({ focused, color }) => (
               <TabIcon name={focused ? 'layers' : 'layers-outline'} focused={focused} color={color} accentColor={c.ACCENT_PURPLE} />
             ),

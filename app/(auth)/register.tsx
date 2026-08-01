@@ -13,7 +13,7 @@ export default function RegisterScreen() {
   const t = useTranslation();
   const { user } = useAuth();
 
-  if (user) return <Redirect href="/(app)/dashboard" />;
+  if (user) return <Redirect href={user.role === 'owner' ? '/(app)/dashboard' : '/(app)/general'} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.BACKGROUND_DARK }}>

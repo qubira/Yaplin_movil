@@ -26,7 +26,7 @@ function getNativeListener() {
  * notification into the shared PaymentsStore.
  */
 export function useNotificationCapture() {
-  const { transactions, addTransaction, refreshTransactions } = useTransactions();
+  const { transactions, generalPool, addTransaction, refreshTransactions } = useTransactions();
   const { integrations } = useIntegrations();
   const { preferences } = usePreferences();
   const { user } = useAuth();
@@ -66,22 +66,24 @@ export function useNotificationCapture() {
   // References already registered — used to dedupe the shade-reconciliation
   // pass below against payments the live listener already captured.
   //
-  // MUST be additive (merge), never a wholesale replace: `transactions` is
-  // the ASSIGNED-only list (GET /transactions never includes GENERAL/
-  // unassigned payments — see PaymentsStore.tsx), so a payment sitting
-  // unassigned is NEVER reflected in it. A prior version of this effect did
-  // `referencesRef.current = new Set(transactions.map(...))`, which wiped
-  // out every reference registerTransaction() had already added for a
-  // still-unassigned payment. reconcileFromShade() re-scans the notification
-  // shade every 20s for as long as a notification stays visible there, so
-  // with the reference gone from this set, an unrouted payment kept getting
-  // registered as a brand-new transaction on every single pass — observed
-  // in production as the same payment duplicated over a dozen times, one
-  // extra row every ~20 seconds until the notification finally left the shade.
+  // MUST be additive (merge), never a wholesale replace: a prior version of
+  // this effect did `referencesRef.current = new Set(transactions.map(...))`,
+  // which wiped out every reference registerTransaction() had already added
+  // for a still-unassigned payment (transactions is assigned-only — GET
+  // /transactions never includes GENERAL/unassigned payments). reconcileFromShade()
+  // re-scans the notification shade every 20s for as long as a notification
+  // stays visible there, so with the reference gone from this set, an
+  // unrouted payment kept getting registered as a brand-new transaction on
+  // every single pass — observed in production as the same payment
+  // duplicated over a dozen times, one extra row every ~20 seconds. Seeding
+  // from generalPool too (not just transactions) covers the same failure
+  // mode across an app restart, when this in-memory set starts empty again
+  // and a payment already known to the server is still sitting unassigned.
   const referencesRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     transactions.forEach(t => referencesRef.current.add(t.reference));
-  }, [transactions]);
+    generalPool.forEach(t => referencesRef.current.add(t.reference));
+  }, [transactions, generalPool]);
 
   // Flush any payments that failed to reach the server (no connectivity at
   // capture time) whenever the app comes back to the foreground.
