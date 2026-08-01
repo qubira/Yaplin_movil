@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react';
 import { View, TouchableWithoutFeedback, BackHandler } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 
 interface StackEntry {
@@ -62,22 +62,32 @@ export function BottomSheetProvider({ children }: { children: ReactNode }) {
   return (
     <BottomSheetContext.Provider value={value}>
       {children}
-      {top && (
+      {/* Every entry in the stack renders, not just the top one — a form
+          sheet presenting a secondary picker on top of itself (e.g.
+          StorePickerModal over the store/member form) used to make the form
+          disappear from the tree entirely while the picker was open, which
+          unmounted it and threw away all its local state (typed fields,
+          the very selection the picker was for). Rendering each entry keeps
+          every lower sheet mounted underneath; its own opaque backdrop and
+          card still fully cover whatever's below it, so this is purely a
+          "stay mounted, not visible" fix, not a visual change. */}
+      {stack.map((entry, i) => (
         <View
+          key={i}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           pointerEvents="box-none"
         >
-          <TouchableWithoutFeedback onPress={() => { if (top.dismissOnBackdrop) dismiss(); }}>
+          <TouchableWithoutFeedback onPress={() => { if (entry.dismissOnBackdrop) dismiss(); }}>
             <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,6,10,0.82)' }}>
               <TouchableWithoutFeedback onPress={() => {}}>
                 <View style={{ width: '100%', marginBottom: keyboardHeight }}>
-                  {top.node}
+                  {entry.node}
                 </View>
               </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
         </View>
-      )}
+      ))}
     </BottomSheetContext.Provider>
   );
 }
