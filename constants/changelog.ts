@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4',
+    date: '1 ago 2026',
+    changes: [
+      {
+        es: 'Se corrigió un error grave: un pago sin asignar podía duplicarse cada 20 segundos mientras su notificación seguía visible en el celular. Ya se limpiaron los duplicados que se habían creado.',
+        en: 'Fixed a serious bug: an unassigned payment could get duplicated every 20 seconds while its notification stayed visible on the phone. The duplicates already created have been cleaned up.',
+      },
+    ],
+  },
+  {
     version: '1.3',
     date: '1 ago 2026',
     changes: [

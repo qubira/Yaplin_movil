@@ -195,6 +195,29 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Faltan campos requeridos' });
   }
 
+  // Reject a repeat capture within a short recent window, keyed on the same
+  // signal the client uses for its own in-memory dedup (businessId +
+  // reference + method) — a safety net for exactly the failure mode already
+  // seen in production: the client's dedup set losing track of an unrouted
+  // payment's reference (still-unassigned payments never appear in its
+  // source list) and re-POSTing the same capture repeatedly. Scoped to a
+  // window instead of a blanket unique constraint because Yape's security
+  // code is only 3 digits — it recycles, so two genuinely different
+  // payments days apart can legitimately land on the same code.
+  if (reference) {
+    const DEDUPE_WINDOW_MS = 60 * 60 * 1000;
+    const recentDuplicate = await prisma.transaction.findFirst({
+      where: {
+        businessId: auth.businessId,
+        reference,
+        method,
+        createdAt: { gte: new Date(Date.now() - DEDUPE_WINDOW_MS) },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (recentDuplicate) return res.status(200).json(toPublic(recentDuplicate));
+  }
+
   const activeStores = await prisma.store.findMany({
     where: { businessId: auth.businessId, status: 'active' },
     select: { id: true },
