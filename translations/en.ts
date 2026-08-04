@@ -258,6 +258,7 @@ const en: typeof es = {
       addressLabel: 'Address',
       addressPlaceholder: '123 Main St',
       accountPlaceholder: 'store@business.com',
+      saveError: 'Could not save. Please try again.',
     },
   },
 

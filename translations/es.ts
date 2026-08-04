@@ -256,6 +256,7 @@ const es = {
       addressLabel: 'Dirección',
       addressPlaceholder: 'Jr. Comercio 123',
       accountPlaceholder: 'tienda@negocio.com',
+      saveError: 'No se pudo guardar. Intenta de nuevo.',
     },
   },
 

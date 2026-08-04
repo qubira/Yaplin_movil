@@ -14,6 +14,7 @@ import { useTransactions } from '../../store/PaymentsStore';
 import { useAuth } from '../../store/AuthStore';
 import TransactionItem from '../../components/ui/TransactionItem';
 import { useTranslation } from '../../store/LocaleStore';
+import { ApiError } from '../../services/api';
 import { computeStoreRevenue, StoreRevenue } from '../../services/storeRevenue';
 import { useTopInset } from '../../hooks/useTopInset';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
@@ -111,7 +112,7 @@ interface StoreFormData {
 function StoreFormSheet({ onClose, initial, onSubmit, title }: {
   onClose: () => void;
   initial: Store | null;
-  onSubmit: (data: StoreFormData) => void;
+  onSubmit: (data: StoreFormData) => Promise<void>;
   title: string;
 }) {
   const { c } = useTheme();
@@ -121,15 +122,25 @@ function StoreFormSheet({ onClose, initial, onSubmit, title }: {
   const [address, setAddress] = useState(initial?.address ?? '');
   const [account, setAccount] = useState(initial?.account ?? '');
   const [methods, setMethods] = useState<StorePaymentMethod[]>(initial?.methods ?? ['yape']);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   function toggleMethod(m: StorePaymentMethod) {
     setMethods(prev => (prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]));
   }
 
-  function handleSubmit() {
-    if (!name.trim()) return;
-    onSubmit({ name: name.trim(), address: address.trim(), account: account.trim(), methods, status: initial?.status ?? 'active' });
-    onClose();
+  async function handleSubmit() {
+    if (!name.trim() || saving) return;
+    setError('');
+    setSaving(true);
+    try {
+      await onSubmit({ name: name.trim(), address: address.trim(), account: account.trim(), methods, status: initial?.status ?? 'active' });
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t.stores.form.saveError);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -163,9 +174,12 @@ function StoreFormSheet({ onClose, initial, onSubmit, title }: {
             );
           })}
         </View>
-        <TouchableOpacity onPress={handleSubmit} disabled={!name.trim()}
-          style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: name.trim() ? c.ACCENT_PURPLE : c.BORDER }}>
-          <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{t.common.actions.save}</Text>
+        {!!error && (
+          <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 16 }}>{error}</Text>
+        )}
+        <TouchableOpacity onPress={handleSubmit} disabled={!name.trim() || saving}
+          style={{ marginTop: 24, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: name.trim() ? c.ACCENT_PURPLE : c.BORDER, opacity: saving ? 0.7 : 1 }}>
+          <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>{saving ? t.common.actions.saving : t.common.actions.save}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onClose}
           style={{ marginTop: 10, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.BACKGROUND_CARD_2, borderWidth: 1, borderColor: c.BORDER }}>

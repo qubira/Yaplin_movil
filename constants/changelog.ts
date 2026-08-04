@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8',
+    date: '4 ago 2026',
+    changes: [
+      {
+        es: 'Ya no se puede crear ni editar una tienda con el mismo nombre o la misma dirección que otra tienda del negocio — evita confusiones al registrar pagos.',
+        en: 'You can no longer create or edit a store with the same name or address as another store in your business — prevents confusion when logging payments.',
+      },
+    ],
+  },
+  {
     version: '1.7',
     date: '4 ago 2026',
     changes: [
