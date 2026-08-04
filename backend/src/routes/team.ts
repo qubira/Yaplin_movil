@@ -115,18 +115,24 @@ router.post('/', async (req, res) => {
 // but never a role field (own or anyone else's — role changes stay
 // owner-only, since letting a supervisor touch roles is a privilege-
 // escalation path), and never another supervisor's or the owner's profile.
-// A cajero can't edit anyone, including themselves.
+// A cajero can't edit anyone, including themselves. A supervisor also can't
+// touch a cajero assigned to a different store than their own — "manage"
+// means same store, not "any cajero in the business".
 function allowedTeamEditFields(
   actorRole: 'owner' | 'supervisor' | 'cajero',
   isSelf: boolean,
-  targetRole: string
+  targetRole: string,
+  actorStoreId: string | null,
+  targetStoreId: string | null
 ): string[] | null {
   if (actorRole === 'owner') return null; // null = unrestricted
   if (actorRole === 'cajero') return [];
   // supervisor
   if (isSelf) return ['name', 'password'];
-  if (targetRole === 'cajero') return ['name', 'password', 'storeId', 'active', 'soundAlertEnabled'];
-  return []; // another supervisor, or the owner
+  if (targetRole === 'cajero' && targetStoreId !== null && targetStoreId === actorStoreId) {
+    return ['name', 'password', 'storeId', 'active', 'soundAlertEnabled'];
+  }
+  return []; // another supervisor, the owner, or a cajero at a different store
 }
 
 router.put('/:id', async (req, res) => {
@@ -144,7 +150,7 @@ router.put('/:id', async (req, res) => {
   // edited, so a raw key-presence check would block every supervisor edit
   // outright, including ones that don't touch a restricted field at all.
   const isSelf = existing.id === auth.userId;
-  const allowedFields = allowedTeamEditFields(auth.role, isSelf, existing.role);
+  const allowedFields = allowedTeamEditFields(auth.role, isSelf, existing.role, auth.storeId, existing.storeId);
   if (allowedFields !== null) {
     const changedFields: string[] = [];
     if (name !== undefined && name !== existing.name) changedFields.push('name');

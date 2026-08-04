@@ -64,18 +64,22 @@ function permByRole(t: typeof dictionaries['es']): Record<TeamMember['role'], { 
 // edit form; the backend re-checks everything itself regardless of what
 // this renders. A cajero can never edit anyone (incl. themselves); a
 // supervisor may edit their own name/password only, or a cajero's
-// name/password/store/active — never a role field, and never another
-// supervisor's or the owner's profile.
+// name/password/store/active — but only a cajero assigned to the
+// supervisor's OWN store ("que administra"). A cajero at a different store
+// is still listed (roster stays visible to everyone), just not editable.
 function memberEditPermissions(
   viewerRole: TeamMember['role'] | undefined,
   viewerId: string | undefined,
+  viewerStoreId: string | null | undefined,
   target: TeamMember
 ): { canEdit: boolean; canEditRole: boolean; canEditStore: boolean; canEditSound: boolean } {
   if (viewerRole === 'owner') return { canEdit: true, canEditRole: true, canEditStore: true, canEditSound: true };
   const isSelf = viewerId === target.id;
   if (viewerRole === 'supervisor') {
     if (isSelf) return { canEdit: true, canEditRole: false, canEditStore: false, canEditSound: false };
-    if (target.role === 'cajero') return { canEdit: true, canEditRole: false, canEditStore: true, canEditSound: true };
+    if (target.role === 'cajero' && target.storeId === viewerStoreId) {
+      return { canEdit: true, canEditRole: false, canEditStore: true, canEditSound: true };
+    }
   }
   return { canEdit: false, canEditRole: false, canEditStore: false, canEditSound: false };
 }
@@ -288,7 +292,7 @@ export default function TeamScreen() {
 
   const selected = team.find(m => m.id === selectedId) ?? null;
   const active = team.filter(m => m.active).length;
-  const selectedEditPerms = selected ? memberEditPermissions(user?.role, user?.id, selected) : null;
+  const selectedEditPerms = selected ? memberEditPermissions(user?.role, user?.id, user?.storeId, selected) : null;
 
   function openAddSheet() {
     present(
@@ -305,7 +309,7 @@ export default function TeamScreen() {
   }
 
   function openEditSheet(member: TeamMember) {
-    const editingPerms = memberEditPermissions(user?.role, user?.id, member);
+    const editingPerms = memberEditPermissions(user?.role, user?.id, user?.storeId, member);
     present(
       <MemberFormSheet
         onClose={dismiss}

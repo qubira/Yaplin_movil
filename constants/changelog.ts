@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7',
+    date: '4 ago 2026',
+    changes: [
+      {
+        es: 'Un supervisor ya no puede activar/desactivar la alerta de sonido (ni editar ningún otro dato) de un cajero de una tienda que no es la suya — solo de los cajeros de su propia tienda.',
+        en: 'A supervisor can no longer toggle the sound alert (or edit any other field) of a cashier from a store that isn’t theirs — only cashiers at their own store.',
+      },
+    ],
+  },
+  {
     version: '1.6',
     date: '1 ago 2026',
     changes: [
