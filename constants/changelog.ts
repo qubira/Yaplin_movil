@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0',
+    date: '4 ago 2026',
+    changes: [
+      {
+        es: 'Se corrigió que un supervisor o cajero asignado a "Todas las tiendas" nunca recibiera alerta de sonido ni push al llegar un pago nuevo a cualquier tienda, sin importar que tuviera el permiso activado.',
+        en: 'Fixed a supervisor or cashier assigned to "All stores" never getting a sound or push alert when a new payment landed at any store, even with the permission turned on.',
+      },
+    ],
+  },
+  {
     version: '1.9',
     date: '4 ago 2026',
     changes: [

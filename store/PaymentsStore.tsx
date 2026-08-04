@@ -211,9 +211,16 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
 
       if (user.role !== 'owner' && prevStoreIdByIdRef.current) {
         const prevStoreById = prevStoreIdByIdRef.current;
+        // user.storeId is null for a cajero/supervisor scoped to "todas las
+        // tiendas" — comparing txn.storeId to that null directly never
+        // matched (every txn here has a real, non-null storeId; GET /
+        // excludes GENERAL), so an "all stores" member never got alerted for
+        // ANY payment landing anywhere. Only gate on user.storeId when it's
+        // actually a single store; compare the "was it already here" check
+        // against txn.storeId itself so it works for both cases.
         const newlyMine = next.filter((txn) => {
-          if (txn.storeId !== user.storeId) return false;
-          return prevStoreById.get(txn.id) !== user.storeId; // wasn't already theirs last check
+          if (user.storeId !== null && txn.storeId !== user.storeId) return false;
+          return prevStoreById.get(txn.id) !== txn.storeId; // wasn't already at this store last check
         });
         // Voice is gated by BOTH the owner/supervisor-assigned permission
         // (user.soundAlertEnabled) and this device's own personal toggle
