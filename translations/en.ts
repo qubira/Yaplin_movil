@@ -210,6 +210,8 @@ const en: typeof es = {
       passwordPlaceholder: 'At least 6 characters',
       roleSectionTitle: 'Role',
       saveError: 'Could not save. Please try again.',
+      emailInUseInfoTitle: 'Why can’t I use this email?',
+      emailInUseInfoDetail: 'Every email must be unique in YapLin. If a team member with this email existed before, deactivating them doesn’t free up the email — it has to be deleted entirely from their detail screen before it can be used on a new account.',
     },
   },
 

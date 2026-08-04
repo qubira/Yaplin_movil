@@ -11,6 +11,19 @@ router.use(requireAuth);
 
 const EMAIL_IN_USE_MESSAGE = 'Este correo ya está registrado en YapLin.';
 
+// A user row is only ever removed by DELETE /team/:id (a real, hard delete
+// — see below), never by the "active" toggle, which just deactivates it in
+// place. So `email` staying globally unique at the DB level means an email
+// can only be reused once its previous account was actually deleted, not
+// merely deactivated — this message tells the owner/supervisor which of
+// the two states is blocking them, since "ya está registrado" alone reads
+// as if deactivating would have been enough.
+function emailInUseMessage(active: boolean): string {
+  return active
+    ? 'Este correo ya está en uso por una cuenta activa en YapLin.'
+    : 'Este correo ya está registrado en YapLin, en una cuenta desactivada (no eliminada).';
+}
+
 function initialsOf(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 }
@@ -68,7 +81,13 @@ router.post('/', async (req, res) => {
   const email = normalizeEmail(rawEmail);
 
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return res.status(409).json({ error: EMAIL_IN_USE_MESSAGE, code: 'EMAIL_IN_USE' });
+  if (existing) {
+    return res.status(409).json({
+      error: emailInUseMessage(existing.active),
+      code: 'EMAIL_IN_USE',
+      emailStatus: existing.active ? 'active' : 'inactive',
+    });
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
@@ -182,7 +201,13 @@ router.put('/:id', async (req, res) => {
 
   if (email !== undefined && email !== existing.email) {
     const emailTaken = await prisma.user.findUnique({ where: { email } });
-    if (emailTaken) return res.status(409).json({ error: EMAIL_IN_USE_MESSAGE, code: 'EMAIL_IN_USE' });
+    if (emailTaken) {
+      return res.status(409).json({
+        error: emailInUseMessage(emailTaken.active),
+        code: 'EMAIL_IN_USE',
+        emailStatus: emailTaken.active ? 'active' : 'inactive',
+      });
+    }
   }
 
   const data: Record<string, unknown> = {};

@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.9',
+    date: '4 ago 2026',
+    changes: [
+      {
+        es: 'Al intentar registrar un colaborador con un correo ya usado, ahora se avisa si esa cuenta está activa o solo desactivada (recuerda: desactivar no libera el correo, hay que eliminar la cuenta) — con un ícono de info para más detalle.',
+        en: 'Trying to register a team member with an email already in use now shows whether that account is active or just deactivated (deactivating doesn’t free up the email — it has to be deleted) — with an info icon for more detail.',
+      },
+    ],
+  },
+  {
     version: '1.8',
     date: '4 ago 2026',
     changes: [

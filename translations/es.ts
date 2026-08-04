@@ -208,6 +208,8 @@ const es = {
       passwordPlaceholder: 'Mínimo 6 caracteres',
       roleSectionTitle: 'Rol',
       saveError: 'No se pudo guardar. Intenta de nuevo.',
+      emailInUseInfoTitle: '¿Por qué no puedo usar este correo?',
+      emailInUseInfoDetail: 'Cada correo debe ser único en YapLin. Si antes existió un colaborador con este correo, desactivarlo no libera el correo — hay que eliminarlo por completo desde su detalle para poder volver a usarlo en una cuenta nueva.',
     },
   },
 

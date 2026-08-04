@@ -153,6 +153,7 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
   const [storeId, setStoreId] = useState<string>(initial?.storeId ?? 'all');
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(initial?.soundAlertEnabled ?? true);
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [saving, setSaving] = useState(false);
   const { present, dismiss } = useBottomSheet();
 
@@ -173,12 +174,18 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
   async function handleSubmit() {
     if (!canSubmit || saving) return;
     setError('');
+    setErrorCode('');
     setSaving(true);
     try {
       await onSubmit({ name: name.trim(), email: email.trim(), role, storeId, soundAlertEnabled, ...(password ? { password } : {}) });
       onClose();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : t.team.form.saveError);
+      if (e instanceof ApiError) {
+        setError(e.message);
+        setErrorCode(e.code ?? '');
+      } else {
+        setError(t.team.form.saveError);
+      }
     } finally {
       setSaving(false);
     }
@@ -261,7 +268,17 @@ function MemberFormSheet({ onClose, initial, storeOptions, onSubmit, title, canE
         )}
 
         {!!error && (
-          <Text style={{ color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 16 }}>{error}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 16 }}>
+            <Text style={{ flex: 1, color: c.ACCENT_RED, fontSize: 13, fontFamily: 'Inter_400Regular' }}>{error}</Text>
+            {errorCode === 'EMAIL_IN_USE' && (
+              <TouchableOpacity
+                onPress={() => Alert.alert(t.team.form.emailInUseInfoTitle, t.team.form.emailInUseInfoDetail)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="information-circle-outline" size={20} color={c.ACCENT_RED} />
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit || saving}
